@@ -12,25 +12,33 @@ fetch.py          — two modes:
                       `uv run fetch.py`        → fetch restaurants from Overpass API
                       `uv run fetch.py foodie`  → augment with foodie URLs from Exa.ai
 index.html        — the entire frontend (inline CSS + JS), no build step
-Makefile          — make db / make site / make dev / make clean
+Makefile          — make db-copy / make db-smoketest / make db / make site / make dev / make clean
 pyproject.toml    — uv project, all deps pinned ==x.y.z, Python pinned ===x.y.z
 .env              — EXA_API_KEY (gitignored)
 .site/            — build output dir (gitignored), served by make dev / GitHub Pages
 .site/data/*.json — pre-fetched restaurant data per city
-.github/workflows/deploy.yml — monthly fetch + deploy to GitHub Pages
+.github/workflows/deploy.yml — manual fetch + deploy to GitHub Pages
 ```
 
 ## How to run
 
 ```bash
-echo "EXA_API_KEY=your-key" > .env    # one-time setup
-make db                                # fetch restaurants + foodie URLs (~15min)
+make db-copy                           # download pre-built data from GitHub Pages
 make dev                               # serve on :8080 with file watching
+```
+
+To rebuild data from scratch (requires Exa API key):
+```bash
+echo "EXA_API_KEY=your-key" > .env    # one-time setup
+make db-smoketest                      # quick: 2 cities, 100 restaurants each
+make db                                # full: all cities, all restaurants (~15min)
 ```
 
 ## Makefile targets
 
-- `make db` — runs Overpass fetch then Exa foodie lookup. Fails if `.env` missing `EXA_API_KEY`.
+- `make db-copy` — downloads pre-built restaurant data from GitHub Pages. No API keys needed — fastest way to get started.
+- `make db-smoketest` — fetches first 2 cities, 100 restaurants each, with foodie lookup. Quick local dev sanity check.
+- `make db` — full Overpass fetch + Exa foodie lookup for all cities. Fails if `.env` missing `EXA_API_KEY`.
 - `make site` — copies `cities.json` + `index.html` into `.site/`. Used by GitHub Actions.
 - `make dev` — depends on `site`. Watches `index.html`/`cities.json` for changes (via `fswatch`) and auto-copies. Serves `.site/` on port 8080.
 - `make clean` — removes `.site/`.
@@ -79,7 +87,7 @@ make dev                               # serve on :8080 with file watching
 
 ## GitHub Actions
 
-- Runs monthly (1st of month, 6am UTC) or on manual dispatch
+- Runs on manual dispatch only
 - `EXA_API_KEY` passed via env (from workflow input or repo secret)
 - Runs `make db` → `make site`
 - Injects last-updated date into `index.html`

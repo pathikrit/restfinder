@@ -61,9 +61,12 @@ def fetch_city(city: dict, max_retries: int = 5) -> list[dict]:
     return restaurants
 
 
-def main():
+def main(quick: bool = False):
     with open("cities.json") as f:
         cities = json.load(f)
+
+    if quick:
+        cities = cities[:2]
 
     os.makedirs(DATA_DIR, exist_ok=True)
 
@@ -76,6 +79,8 @@ def main():
             print(f"  FAILED: {e}")
             failed.append(city["name"])
             continue
+        if quick:
+            restaurants = restaurants[:100]
         out_path = os.path.join(DATA_DIR, f"{city['key']}.json")
         with open(out_path, "w") as f:
             json.dump(restaurants, f)
@@ -131,7 +136,7 @@ def fetch_urls(restaurant: str, city: str, foodie_sites: list[str], exa, max_ret
             return None
 
 
-def foodie_main():
+def foodie_main(quick: bool = False):
     """Augment saved restaurant data with foodie URLs from Exa.ai."""
     from dotenv import load_dotenv
     from exa_py import Exa
@@ -146,6 +151,9 @@ def foodie_main():
 
     with open("cities.json") as f:
         cities = json.load(f)
+
+    if quick:
+        cities = cities[:2]
 
     for city in cities:
         foodie_sites = city.get("foodie_sites", [])
@@ -199,7 +207,8 @@ def foodie_main():
 
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1 and sys.argv[1] == "foodie":
-        foodie_main()
+    quick = "--quick" in sys.argv
+    if "foodie" in sys.argv:
+        foodie_main(quick=quick)
     else:
-        main()
+        main(quick=quick)

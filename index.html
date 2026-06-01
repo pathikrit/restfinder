@@ -333,14 +333,12 @@
                 const address = formatAddress(r);
                 const phone = t(r, 'phone');
                 const website = t(r, 'website');
-                const hours = formatHours(r);
 
                 let popup = `<strong>${esc(name)}</strong>`;
                 if (cuisine) popup += `<br>${esc(cuisine)}`;
                 if (address) popup += `<br><i class="fa-solid fa-location-dot"></i> <address style="font-style:normal;display:inline">${esc(address)}</address>`;
                 if (phone) popup += `<br><i class="fa-solid fa-phone"></i> <a href="tel:${esc(phone)}">${esc(phone)}</a>`;
                 if (website) popup += `<br><a href="${esc(website)}" target="_blank" rel="noopener">Website</a>`;
-                if (hours) popup += `<br>${esc(hours)}`;
                 if (r.foodie_urls && r.foodie_urls.length) {
                     popup += `<br><strong style="color:#f59e0b">Mentions:</strong> ${formatFoodieLinks(r.foodie_urls)}`;
                 }
