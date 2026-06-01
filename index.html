@@ -42,19 +42,38 @@
         }
         #github-link:hover { color: #f1f5f9; }
 
-        .pill {
-            padding: 4px 14px;
-            border-radius: 9999px;
-            border: 1px solid #334155;
-            background: none;
-            color: #64748b;
+        .toggle-switch {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            vertical-align: middle;
+            margin-left: 6px;
             font-size: 12px;
             font-weight: 600;
-            cursor: pointer;
-            transition: all 0.15s;
+            color: #64748b;
         }
-        .pill:hover { border-color: #f59e0b; color: #fbbf24; }
-        .pill.active { background: #451a03; border-color: #f59e0b; color: #fbbf24; }
+        .toggle-switch.active { color: #fbbf24; }
+        .toggle-track {
+            position: relative;
+            width: 32px;
+            height: 18px;
+            background: #334155;
+            border-radius: 9px;
+            transition: background 0.15s;
+        }
+        .toggle-switch.active .toggle-track { background: #f59e0b; }
+        .toggle-knob {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 14px;
+            height: 14px;
+            background: #e2e8f0;
+            border-radius: 50%;
+            transition: transform 0.15s;
+        }
+        .toggle-switch.active .toggle-knob { transform: translateX(14px); }
         #last-updated {
             margin-left: auto;
             display: flex;
@@ -103,6 +122,48 @@
         #table-wrap td a { color: #60a5fa; text-decoration: none; }
         #table-wrap td a:hover { text-decoration: underline; }
         #table-wrap td a.foodie-link { color: #f59e0b; }
+        .col-filter {
+            display: flex;
+            align-items: center;
+            margin-top: 4px;
+            position: relative;
+        }
+        .col-filter input {
+            width: 100%;
+            padding: 3px 20px 3px 6px;
+            border: 1px solid #334155;
+            border-radius: 4px;
+            background: #0f172a;
+            color: #e2e8f0;
+            font-size: 11px;
+            outline: none;
+        }
+        .col-filter input::placeholder { color: #475569; }
+        .col-filter input:focus { border-color: #3b82f6; }
+        .col-filter .clear-btn {
+            position: absolute;
+            right: 3px;
+            background: none;
+            border: none;
+            color: #475569;
+            font-size: 13px;
+            cursor: pointer;
+            display: none;
+            line-height: 1;
+            padding: 0 2px;
+        }
+        .col-filter .clear-btn:hover { color: #e2e8f0; }
+        .col-filter input:not(:placeholder-shown) + .clear-btn { display: block; }
+        .pin-label {
+            font-size: 12px;
+            font-weight: 600;
+            background: rgba(15, 23, 42, 0.85);
+            color: #f1f5f9;
+            border: 1px solid #334155;
+            border-radius: 4px;
+            padding: 2px 6px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+        }
         #placeholder {
             display: flex;
             align-items: center;
@@ -138,7 +199,8 @@
         let activeCity = null;
         let cityData = {};
         let markers = {};
-        let foodieFilter = false;
+        let foodieFilter = true;
+        let colFilters = { name: '', cuisine: '', address: '' };
 
         // --- Last updated ---
         const updatedMeta = document.querySelector('meta[name="last-updated"]');
@@ -219,7 +281,8 @@
         }
 
         function formatCuisine(r) {
-            return t(r, 'cuisine').replace(/;/g, ', ');
+            return t(r, 'cuisine').replace(/;/g, ', ').replace(/_/g, ' ')
+                .replace(/\b\w/g, c => c.toUpperCase());
         }
 
         function formatHours(r) {
@@ -229,7 +292,9 @@
         function formatFoodieLinks(urls) {
             if (!urls || !urls.length) return '';
             return urls.map(url => {
-                const domain = new URL(url).hostname.replace(/^www\./, '');
+                const parts = new URL(url).hostname.replace(/^www\./, '').split('.');
+                const domain = (parts.length > 2 ? parts.slice(1, -1) : parts.slice(0, -1)).join('.')
+                    .replace(/\b\w/g, c => c.toUpperCase());
                 return `<a href="${esc(url)}" target="_blank" rel="noopener" class="foodie-link">${esc(domain)}</a>`;
             }).join(', ');
         }
@@ -245,6 +310,19 @@
 
             if (foodieFilter) {
                 visible = visible.filter(r => r.foodie_urls && r.foodie_urls.length > 0);
+            }
+
+            if (colFilters.name) {
+                const q = colFilters.name.toLowerCase();
+                visible = visible.filter(r => (t(r, 'name') || '').toLowerCase().includes(q));
+            }
+            if (colFilters.cuisine) {
+                const q = colFilters.cuisine.toLowerCase();
+                visible = visible.filter(r => formatCuisine(r).toLowerCase().includes(q));
+            }
+            if (colFilters.address) {
+                const q = colFilters.address.toLowerCase();
+                visible = visible.filter(r => formatAddress(r).toLowerCase().includes(q));
             }
 
             markerLayer.clearLayers();
@@ -264,22 +342,19 @@
                 if (website) popup += `<br><a href="${esc(website)}" target="_blank" rel="noopener">Website</a>`;
                 if (hours) popup += `<br>${esc(hours)}`;
                 if (r.foodie_urls && r.foodie_urls.length) {
-                    popup += `<br><strong style="color:#f59e0b">Foodie:</strong> ${formatFoodieLinks(r.foodie_urls)}`;
+                    popup += `<br><strong style="color:#f59e0b">Mentions:</strong> ${formatFoodieLinks(r.foodie_urls)}`;
                 }
                 const m = L.marker([r.lat, r.lon]).bindPopup(popup);
+                if (foodieFilter) m.bindTooltip(name, { permanent: true, direction: 'top', className: 'pin-label' });
                 m.addTo(markerLayer);
                 markers[r.id] = m;
             });
 
-            if (visible.length === 0) {
-                tableWrap.innerHTML = '<div id="placeholder">No restaurants in this area.</div>';
-                return;
-            }
-
-            const foodieToggleHtml = `<button id="foodie-toggle" class="pill${foodieFilter ? ' active' : ''}" style="margin-left:6px;vertical-align:middle">Foodie</button>`;
+            const foodieToggleHtml = `<div class="col-filter" style="justify-content:center"><label id="foodie-toggle" class="toggle-switch${foodieFilter ? ' active' : ''}"><span class="toggle-track"><span class="toggle-knob"></span></span>Only</label></div>`;
+            const filterInput = (key) => `<div class="col-filter"><input type="text" data-filter="${key}" placeholder="Filter..." value="${esc(colFilters[key])}"><button class="clear-btn" data-clear="${key}">&times;</button></div>`;
             let html = `<table><thead><tr>
-                <th>#</th><th>Name</th><th>Cuisine</th><th>Address</th>
-                <th>Phone</th><th>Hours</th><th>Website</th><th>Foodie ${foodieToggleHtml}</th>
+                <th>#</th><th>Name${filterInput('name')}</th><th>Cuisine${filterInput('cuisine')}</th><th>Address${filterInput('address')}</th>
+                <th>Phone</th><th>Hours</th><th>Website</th><th>Mentions${foodieToggleHtml}</th>
                 </tr></thead><tbody>`;
             visible.forEach((r, i) => {
                 const name = t(r, 'name') || 'Unnamed';
@@ -294,16 +369,38 @@
                     <td>${i + 1}</td>
                     <td title="${esc(name)}">${esc(name)}</td>
                     <td title="${esc(cuisine)}">${esc(cuisine)}</td>
-                    <td title="${esc(address)}">${esc(address)}</td>
-                    <td>${esc(phone)}</td>
+                    <td title="${esc(address)}"><address style="font-style:normal">${esc(address)}</address></td>
+                    <td>${phone ? `<a href="tel:${esc(phone)}">${esc(phone)}</a>` : ''}</td>
                     <td title="${esc(hours)}">${esc(hours)}</td>
                     <td>${site}</td>
                     <td>${foodie}</td></tr>`;
             });
+            if (visible.length === 0) {
+                html += `<tr><td colspan="8" style="text-align:center;color:#475569;padding:20px">No matching restaurants.</td></tr>`;
+            }
             html += '</tbody></table>';
+            const activeFilter = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.filter;
             tableWrap.innerHTML = html;
 
             document.getElementById('foodie-toggle').addEventListener('click', onFoodieToggle);
+            tableWrap.querySelectorAll('.col-filter input').forEach(input => {
+                input.addEventListener('input', e => {
+                    colFilters[e.target.dataset.filter] = e.target.value;
+                    updateView();
+                });
+                input.addEventListener('click', e => e.stopPropagation());
+                if (input.dataset.filter === activeFilter) {
+                    input.focus();
+                    input.setSelectionRange(input.value.length, input.value.length);
+                }
+            });
+            tableWrap.querySelectorAll('.col-filter .clear-btn').forEach(btn => {
+                btn.addEventListener('click', e => {
+                    e.stopPropagation();
+                    colFilters[btn.dataset.clear] = '';
+                    updateView();
+                });
+            });
 
             tableWrap.querySelectorAll('tr.data-row').forEach(row => {
                 row.addEventListener('click', () => {
