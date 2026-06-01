@@ -7,52 +7,35 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #e2e8f0; }
 
         #city-tabs {
             display: flex;
-            background: #1e293b;
+            background: #0f172a;
             padding: 0 12px;
+            border-bottom: 1px solid #1e293b;
         }
         #city-tabs button {
             padding: 10px 20px;
             background: none;
             border: none;
-            color: #94a3b8;
+            color: #64748b;
             font-size: 14px;
             font-weight: 600;
             cursor: pointer;
             border-bottom: 3px solid transparent;
             transition: color 0.15s, border-color 0.15s;
         }
-        #city-tabs button:hover { color: #e2e8f0; }
-        #city-tabs button.active { color: #fff; border-bottom-color: #3b82f6; }
+        #city-tabs button:hover { color: #cbd5e1; }
+        #city-tabs button.active { color: #f1f5f9; border-bottom-color: #3b82f6; }
 
         #map-wrap { position: relative; height: 50%; }
         #map { width: 100%; height: 100%; }
-        #search-btn {
-            position: absolute;
-            top: 12px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 1000;
-            padding: 10px 22px;
-            font-size: 14px;
-            font-weight: 600;
-            background: #2563eb;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-        }
-        #search-btn:hover { background: #1d4ed8; }
-        #search-btn:disabled { background: #9ca3af; cursor: not-allowed; }
 
         #table-wrap {
-            height: calc(50% - 41px);
+            height: calc(50% - 42px);
             overflow-y: auto;
-            background: #f8fafc;
+            background: #0f172a;
         }
         #table-wrap table {
             width: 100%;
@@ -62,52 +45,51 @@
         #table-wrap thead {
             position: sticky;
             top: 0;
-            background: #e2e8f0;
+            background: #1e293b;
         }
         #table-wrap th {
             text-align: left;
             padding: 8px 10px;
             font-weight: 600;
-            color: #334155;
-            border-bottom: 2px solid #cbd5e1;
+            color: #94a3b8;
+            border-bottom: 2px solid #334155;
         }
         #table-wrap td {
             padding: 7px 10px;
-            border-bottom: 1px solid #e2e8f0;
-            color: #1e293b;
+            border-bottom: 1px solid #1e293b;
+            color: #cbd5e1;
             max-width: 220px;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
         }
         #table-wrap tr.data-row { cursor: pointer; }
-        #table-wrap tr.data-row:hover { background: #dbeafe; }
-        #table-wrap tr.data-row.selected { background: #bfdbfe; }
-        #table-wrap td a { color: #2563eb; text-decoration: none; }
+        #table-wrap tr.data-row:hover { background: #1e293b; }
+        #table-wrap tr.data-row.selected { background: #1e3a5f; }
+        #table-wrap td a { color: #60a5fa; text-decoration: none; }
         #table-wrap td a:hover { text-decoration: underline; }
         #placeholder {
             display: flex;
             align-items: center;
             justify-content: center;
             height: 100%;
-            color: #94a3b8;
+            color: #475569;
             font-size: 15px;
         }
+        /* Keep default light popups to match OSM tiles */
     </style>
 </head>
 <body>
     <nav id="city-tabs"></nav>
     <div id="map-wrap">
         <div id="map"></div>
-        <button id="search-btn">Search Here</button>
     </div>
     <div id="table-wrap">
-        <div id="placeholder">Click "Search Here" to find restaurants in the visible area</div>
+        <div id="placeholder">Loading...</div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
     <script>
-        const MIN_ZOOM = 13;
         const map = L.map('map');
         L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
@@ -115,14 +97,13 @@
         }).addTo(map);
 
         const markerLayer = L.layerGroup().addTo(map);
-        const searchBtn = document.getElementById('search-btn');
         const tableWrap = document.getElementById('table-wrap');
         const tabsNav = document.getElementById('city-tabs');
 
         let cities = [];
         let activeCity = null;
-        let cityData = {};   // key -> array of restaurants (cached)
-        let markers = {};    // id -> L.marker
+        let cityData = {};
+        let markers = {};
 
         function esc(s) {
             const d = document.createElement('div');
@@ -143,40 +124,55 @@
             selectCity(cities[0].key);
         });
 
-        function selectCity(key) {
+        async function selectCity(key) {
             activeCity = key;
             tabsNav.querySelectorAll('button').forEach(b =>
                 b.classList.toggle('active', b.dataset.key === key));
             const city = cities.find(c => c.key === key);
             map.setView([city.lat, city.lng], city.zoom);
-            markerLayer.clearLayers();
-            markers = {};
-            tableWrap.innerHTML = '<div id="placeholder">Click "Search Here" to find restaurants in the visible area</div>';
+
+            tableWrap.innerHTML = '<div id="placeholder">Loading...</div>';
+            try {
+                await loadCityData(key);
+                updateView();
+            } catch (err) {
+                console.error(err);
+                tableWrap.innerHTML = '<div id="placeholder">Failed to load restaurant data.</div>';
+            }
         }
 
-        // --- Load pre-fetched data for a city (cached) ---
         async function loadCityData(key) {
-            if (cityData[key]) return cityData[key];
+            if (cityData[key]) return;
             const resp = await fetch(`data/${key}.json`);
             if (!resp.ok) throw new Error(`Failed to load data/${key}.json`);
             cityData[key] = await resp.json();
-            return cityData[key];
         }
 
-        // --- Filter + display ---
-        function showRestaurants(restaurants) {
+        // --- Filter to visible bounds and render ---
+        function updateView() {
+            if (!activeCity || !cityData[activeCity]) return;
+            const bounds = map.getBounds();
+            const visible = cityData[activeCity].filter(r =>
+                r.lat >= bounds.getSouth() && r.lat <= bounds.getNorth() &&
+                r.lon >= bounds.getWest() && r.lon <= bounds.getEast()
+            );
+
             markerLayer.clearLayers();
             markers = {};
-
-            restaurants.forEach(r => {
-                const m = L.marker([r.lat, r.lon])
-                    .bindPopup(`<strong>${esc(r.name)}</strong>${r.cuisine ? '<br>' + esc(r.cuisine) : ''}`);
+            visible.forEach(r => {
+                let popup = `<strong>${esc(r.name)}</strong>`;
+                if (r.cuisine) popup += `<br>${esc(r.cuisine)}`;
+                if (r.address) popup += `<br><address style="font-style:normal;display:inline">${esc(r.address)}</address>`;
+                if (r.phone) popup += `<br><a href="tel:${esc(r.phone)}">${esc(r.phone)}</a>`;
+                if (r.website) popup += `<br><a href="${esc(r.website)}" target="_blank" rel="noopener">${esc(r.website.replace(/^https?:\/\//, ''))}</a>`;
+                if (r.hours) popup += `<br>${esc(r.hours)}`;
+                const m = L.marker([r.lat, r.lon]).bindPopup(popup);
                 m.addTo(markerLayer);
                 markers[r.id] = m;
             });
 
-            if (restaurants.length === 0) {
-                tableWrap.innerHTML = '<div id="placeholder">No restaurants found in this area.</div>';
+            if (visible.length === 0) {
+                tableWrap.innerHTML = '<div id="placeholder">No restaurants in this area.</div>';
                 return;
             }
 
@@ -184,7 +180,7 @@
                 <th>#</th><th>Name</th><th>Cuisine</th><th>Address</th>
                 <th>Phone</th><th>Hours</th><th>Website</th>
                 </tr></thead><tbody>`;
-            restaurants.forEach((r, i) => {
+            visible.forEach((r, i) => {
                 const site = r.website ? `<a href="${esc(r.website)}" target="_blank" rel="noopener">link</a>` : '';
                 html += `<tr class="data-row" data-id="${r.id}" data-lat="${r.lat}" data-lon="${r.lon}">
                     <td>${i + 1}</td>
@@ -211,34 +207,7 @@
             });
         }
 
-        // --- Search: filter pre-loaded data to visible bounds ---
-        async function searchRestaurants() {
-            if (map.getZoom() < MIN_ZOOM) {
-                tableWrap.innerHTML = '<div id="placeholder">Please zoom in closer before searching.</div>';
-                return;
-            }
-
-            searchBtn.disabled = true;
-            searchBtn.textContent = 'Loading\u2026';
-
-            try {
-                const all = await loadCityData(activeCity);
-                const bounds = map.getBounds();
-                const visible = all.filter(r =>
-                    r.lat >= bounds.getSouth() && r.lat <= bounds.getNorth() &&
-                    r.lon >= bounds.getWest() && r.lon <= bounds.getEast()
-                );
-                showRestaurants(visible);
-            } catch (err) {
-                console.error(err);
-                tableWrap.innerHTML = '<div id="placeholder">Failed to load restaurant data.</div>';
-            } finally {
-                searchBtn.disabled = false;
-                searchBtn.textContent = 'Search Here';
-            }
-        }
-
-        searchBtn.addEventListener('click', searchRestaurants);
+        map.on('moveend', updateView);
     </script>
 </body>
 </html>
