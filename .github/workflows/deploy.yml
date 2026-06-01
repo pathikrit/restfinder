@@ -1,7 +1,12 @@
-name: Fetch & Deploy
+name: Deploy
 
 on:
   workflow_dispatch:
+    inputs:
+      build_db:
+        description: "Rebuild restaurant database from scratch"
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -21,13 +26,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: astral-sh/setup-uv@v6
+      - if: ${{ inputs.build_db }}
+        uses: astral-sh/setup-uv@v6
         with:
           version: "latest"
 
-      - run: make db
+      - if: ${{ inputs.build_db }}
+        run: make db
         env:
           EXA_API_KEY: ${{ secrets.EXA_API_KEY }}
+
+      - if: ${{ !inputs.build_db }}
+        run: make db-copy
 
       - name: Inject last-updated timestamp
         run: sed -i 's/\(name="last-updated" content="\)[^"]*/\1'"$(date -u +%Y-%m-%d)"'/' index.html
