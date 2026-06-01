@@ -106,7 +106,7 @@ def fetch_urls(restaurant: str, city: str, foodie_sites: list[str], exa, max_ret
 
     def _search():
         return exa.search(
-            query=f"{restaurant} {city} restaurant",
+            query=f'"{restaurant}" {city} restaurant',
             type="instant",
             num_results=5,
             include_domains=foodie_sites,

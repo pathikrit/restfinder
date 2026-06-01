@@ -43,38 +43,26 @@
         }
         #github-link:hover { color: #f1f5f9; }
 
-        .toggle-switch {
+        .foodie-checks {
+            display: flex;
+            gap: 8px;
+            margin-top: 4px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .foodie-checks label {
             display: inline-flex;
             align-items: center;
-            gap: 6px;
+            gap: 3px;
             cursor: pointer;
-            vertical-align: middle;
-            margin-left: 6px;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 600;
             color: #64748b;
         }
-        .toggle-switch.active { color: #fbbf24; }
-        .toggle-track {
-            position: relative;
-            width: 32px;
-            height: 18px;
-            background: #334155;
-            border-radius: 9px;
-            transition: background 0.15s;
+        .foodie-checks label.active { color: #fbbf24; }
+        .foodie-checks input[type="checkbox"] {
+            accent-color: #f59e0b;
         }
-        .toggle-switch.active .toggle-track { background: #f59e0b; }
-        .toggle-knob {
-            position: absolute;
-            top: 2px;
-            left: 2px;
-            width: 14px;
-            height: 14px;
-            background: #e2e8f0;
-            border-radius: 50%;
-            transition: transform 0.15s;
-        }
-        .toggle-switch.active .toggle-knob { transform: translateX(14px); }
         #last-updated {
             margin-left: auto;
             display: flex;
@@ -215,19 +203,19 @@
         let activeCity = null;
         let cityData = {};
         let markers = {};
-        let foodieFilter = true;
+        const foodieSites = [
+            { key: 'eater', label: 'Eater', match: 'eater.com' },
+            { key: 'infatuation', label: 'Infatuation', match: 'theinfatuation.com' },
+            { key: 'found', label: 'Found', match: 'itsfound.com' },
+            { key: 'michelin', label: 'Michelin', match: 'guide.michelin.com' },
+        ];
+        let foodieChecked = {};
         let colFilters = { name: '', cuisine: '', address: '' };
 
         // --- Last updated ---
         const updatedMeta = document.querySelector('meta[name="last-updated"]');
         if (updatedMeta && updatedMeta.content) {
             document.getElementById('last-updated').textContent = 'Updated: ' + updatedMeta.content;
-        }
-
-        // --- Foodie toggle ---
-        function onFoodieToggle() {
-            foodieFilter = !foodieFilter;
-            updateView();
         }
 
         function esc(s) {
@@ -274,11 +262,29 @@
             }
         }
 
+        const lowValueUrl = url => {
+            try {
+                const u = new URL(url);
+                const p = u.pathname;
+                if (u.hostname === 'www.theinfatuation.com' && /\/reviews\//.test(p)) return true;
+                if (u.hostname === 'www.theinfatuation.com' && /\/cuisines\//.test(p)) return true;
+                if (u.hostname.endsWith('eater.com') && /\/venue\//.test(p)) return true;
+                if (u.hostname.endsWith('eater.com') && /open/i.test(p)) return true;
+                if (u.hostname.endsWith('eater.com') && p === '/') return true;
+                if (u.hostname.endsWith('itsfound.com') && !/\/p\//.test(p)) return true;
+            } catch { return false; }
+            return false;
+        };
+
         async function loadCityData(key) {
             if (cityData[key]) return;
             const resp = await fetch(`data/${key}.json`);
             if (!resp.ok) throw new Error(`Failed to load data/${key}.json`);
-            cityData[key] = await resp.json();
+            const data = await resp.json();
+            data.forEach(r => {
+                if (r.foodie_urls) r.foodie_urls = r.foodie_urls.filter(u => !lowValueUrl(u));
+            });
+            cityData[key] = data;
         }
 
         // --- Extract fields from raw tags (or legacy flat format) ---
@@ -324,8 +330,11 @@
                 r.lon >= bounds.getWest() && r.lon <= bounds.getEast()
             );
 
-            if (foodieFilter) {
-                visible = visible.filter(r => r.foodie_urls && r.foodie_urls.length > 0);
+            const activeSites = foodieSites.filter(s => foodieChecked[s.key]);
+            if (activeSites.length) {
+                visible = visible.filter(r => r.foodie_urls && r.foodie_urls.some(u =>
+                    activeSites.some(s => u.includes(s.match))
+                ));
             }
 
             if (colFilters.name) {
@@ -364,11 +373,13 @@
                 markers[r.id] = m;
             });
 
-            const foodieToggleHtml = `<div class="col-filter" style="justify-content:center"><label id="foodie-toggle" class="toggle-switch${foodieFilter ? ' active' : ''}"><span class="toggle-track"><span class="toggle-knob"></span></span>Only</label></div>`;
+            const foodieChecksHtml = `<div class="foodie-checks">${foodieSites.map(s =>
+                `<label class="${foodieChecked[s.key] ? 'active' : ''}"><input type="checkbox" data-site="${s.key}" ${foodieChecked[s.key] ? 'checked' : ''}>${s.label}</label>`
+            ).join('')}</div>`;
             const filterInput = (key) => `<div class="col-filter"><input type="text" data-filter="${key}" placeholder="Filter..." value="${esc(colFilters[key])}"><button class="clear-btn" data-clear="${key}">&times;</button></div>`;
             let html = `<table><thead><tr>
                 <th>#</th><th>Name${filterInput('name')}</th><th>Cuisine${filterInput('cuisine')}</th><th>Address${filterInput('address')}</th>
-                <th>Phone</th><th>Hours</th><th>Mentions${foodieToggleHtml}</th>
+                <th>Phone</th><th>Hours</th><th>Mentions${foodieChecksHtml}</th>
                 </tr></thead><tbody>`;
             visible.forEach((r, i) => {
                 const name = t(r, 'name') || 'Unnamed';
@@ -395,7 +406,13 @@
             const activeFilter = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.filter;
             tableWrap.innerHTML = html;
 
-            document.getElementById('foodie-toggle').addEventListener('click', onFoodieToggle);
+            tableWrap.querySelectorAll('.foodie-checks input').forEach(cb => {
+                cb.addEventListener('change', e => {
+                    foodieChecked[e.target.dataset.site] = e.target.checked;
+                    updateView();
+                });
+                cb.addEventListener('click', e => e.stopPropagation());
+            });
             tableWrap.querySelectorAll('.col-filter input').forEach(input => {
                 input.addEventListener('input', e => {
                     colFilters[e.target.dataset.filter] = e.target.value;
