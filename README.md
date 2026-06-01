@@ -1,19 +1,22 @@
 # RestFinder
 
-Find restaurants on a map. Zoom in, click "Search Here", see restaurants.
+Find restaurants on a map. Pick a city, zoom in, click "Search Here".
 
 ## How it works
 
-- Single HTML file — no build tools, no framework, no backend
-- [Leaflet.js](https://leafletjs.com/) + OpenStreetMap tiles for the map
-- [Overpass API](https://overpass-api.de/) for restaurant data (free, no API key)
-- Scoped to NYC for now
+Data is pre-fetched from [OpenStreetMap](https://www.openstreetmap.org/) via the Overpass API. The frontend is a static page that loads the pre-fetched JSON — no runtime API calls.
 
-## Run locally
+## Setup
 
 ```
-python3 -m http.server 8080
-open http://localhost:8080/index.html
+make fetch   # download restaurant data (~30s)
+make dev     # serve on http://localhost:8080
 ```
 
-Must be served via HTTP (not `file://`) due to CORS.
+## Deploy
+
+Deployed nightly to GitHub Pages via Actions. See `.github/workflows/deploy.yml`.
+
+## Cities
+
+NYC, Miami, SF, LA, Chicago. Add more in `cities.json`.

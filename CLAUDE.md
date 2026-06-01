@@ -2,26 +2,34 @@
 
 ## Project
 
-RestFinder — minimal restaurant finder for NYC. Single-page static app.
+RestFinder — minimal restaurant finder. Pre-fetches data from OpenStreetMap, serves as a static site.
 
 ## Architecture
 
-- `index.html` — the entire app (HTML + CSS + JS, all inline)
-- No build tools, no package.json, no framework
-- Map: Leaflet.js via CDN + OpenStreetMap tiles
-- Data: Overpass API (OpenStreetMap) — free, no API key, CORS-enabled
-- Must be served over HTTP (not file://) for CORS to work
+- `cities.json` — city definitions (name, center, zoom, bbox for Overpass query)
+- `fetch.py` — Python script that queries Overpass API for each city, saves processed JSON to `.site/data/`
+- `index.html` — static app that loads pre-fetched JSON, no runtime API calls
+- `Makefile` — `make fetch` to download data, `make dev` to serve locally
+- `.github/workflows/deploy.yml` — nightly fetch + deploy to GitHub Pages
+
+## Stack
+
+- **Frontend**: Leaflet.js 1.9.4 (CDN) + OpenStreetMap tiles, vanilla JS
+- **Data**: Overpass API (OpenStreetMap), fetched offline by `fetch.py`
+- **Python deps**: `requests`, `truststore` (for corporate proxy SSL)
+- **Serving**: static files from `.site/` directory
 
 ## Dev
 
 ```
-python3 -m http.server 8080
+make fetch   # download restaurant data for all cities
+make dev     # copy files to .site/ and serve on :8080
+make clean   # remove .site/
 ```
-
-Then open http://localhost:8080/index.html
 
 ## Key decisions
 
-- Overpass API chosen over Google/Foursquare/Yelp because it's free, needs no API key, and supports browser-side CORS
-- Queries both OSM nodes and ways for restaurants (`amenity=restaurant`)
-- Zoom guard at level 14 prevents overly large Overpass queries
+- No runtime API calls — data is pre-fetched and served as static JSON
+- `truststore` used to handle corporate proxy SSL interception
+- "Search Here" filters pre-loaded data to visible map bounds (instant, no network)
+- `.site/` is gitignored; built fresh by fetch + copy
