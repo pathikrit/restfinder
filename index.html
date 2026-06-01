@@ -359,7 +359,7 @@
                     popup += `<br><strong style="color:#f59e0b">Mentions:</strong> ${formatFoodieLinks(r.foodie_urls)}`;
                 }
                 const m = L.marker([r.lat, r.lon]).bindPopup(popup);
-                if (foodieFilter) m.bindTooltip(name, { permanent: true, direction: 'top', className: 'pin-label' });
+                if (visible.length <= 10) m.bindTooltip(name, { permanent: true, direction: 'top', className: 'pin-label' });
                 m.addTo(markerLayer);
                 markers[r.id] = m;
             });
