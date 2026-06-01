@@ -9,6 +9,12 @@ import time
 import truststore
 truststore.inject_into_ssl()
 
+# Clear invalid SSL env vars (e.g. set to "None" by corporate proxies) so requests
+# falls back to certifi / OS trust store via truststore
+for _var in ("SSL_CERT_FILE", "REQUESTS_CA_BUNDLE"):
+    if os.environ.get(_var) in (None, "", "None"):
+        os.environ.pop(_var, None)
+
 import requests  # noqa: E402
 
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
@@ -16,11 +22,8 @@ SITE_DIR = ".site"
 DATA_DIR = os.path.join(SITE_DIR, "data")
 
 
-# ---------------------------------------------------------------------------
-# Overpass: fetch restaurants
-# ---------------------------------------------------------------------------
-
 def fetch_city(city: dict) -> list[dict]:
+    """Fetch restaurants for a city from the Overpass API."""
     bbox = city["bbox"]
     query = (
         f'[out:json][timeout:60];'
@@ -67,10 +70,6 @@ def main():
     print("Done.")
 
 
-# ---------------------------------------------------------------------------
-# Exa: fetch foodie URLs
-# ---------------------------------------------------------------------------
-
 def get_restaurant_name(r: dict) -> str:
     if "tags" in r:
         return r["tags"].get("name", "")
@@ -98,6 +97,7 @@ def fetch_urls(restaurant: str, city: str, foodie_sites: list[str], exa, max_ret
 
 
 def foodie_main():
+    """Augment saved restaurant data with foodie URLs from Exa.ai."""
     from dotenv import load_dotenv
     from exa_py import Exa
 

@@ -1,8 +1,7 @@
 [project]
 name = "restfinder"
-version = "0.1.0"
-description = "Find restaurants on a map"
-requires-python = ">=3.11"
+version = "0.0.1"
+requires-python = "===3.13.2"
 dependencies = [
     "requests==2.34.2",
     "truststore==0.10.4",

@@ -1,42 +1,92 @@
 # CLAUDE.md
 
-## Project
+## What is this
 
-RestFinder — restaurant finder with foodie site mentions. Pre-fetches data, serves as a static site.
+RestFinder — a static restaurant finder app. Shows restaurants on a map with data from OpenStreetMap, augmented with mentions from foodie review sites via Exa.ai. Deployed to GitHub Pages at pathikrit.github.io/restfinder.
 
-## Architecture
-
-- `cities.json` — city definitions (center, zoom, bbox, foodie_sites)
-- `fetch.py` — two modes:
-  - Default: queries Overpass API, saves raw restaurant data to `.site/data/`
-  - `foodie`: queries Exa.ai for each restaurant against foodie sites, augments data with `foodie_urls`
-- `index.html` — static app, loads pre-fetched JSON, no runtime API calls
-- `Makefile` — `make db` (fetch + foodie), `make site` (copy), `make dev` (watch + serve)
-- `.github/workflows/deploy.yml` — monthly fetch + deploy to GitHub Pages
-
-## Stack
-
-- **Frontend**: Leaflet.js 1.9.4 (CDN), vanilla JS
-- **Data**: Overpass API (OSM) for restaurants, Exa.ai for foodie URLs
-- **Python deps**: requests, truststore, exa-py, python-dotenv (all pinned ==)
-- **Serving**: static files from `.site/`
-
-## Dev
+## File layout
 
 ```
-# Set up API key
-echo "EXA_API_KEY=your-key" > .env
-
-make db    # fetch restaurants + foodie URLs
-make dev   # copy to .site/ + serve on :8080 with watch mode
-make clean # remove .site/
+cities.json       — city definitions: center, zoom, bbox (for Overpass), foodie_sites (for Exa)
+fetch.py          — two modes:
+                      `uv run fetch.py`        → fetch restaurants from Overpass API
+                      `uv run fetch.py foodie`  → augment with foodie URLs from Exa.ai
+index.html        — the entire frontend (inline CSS + JS), no build step
+Makefile          — make db / make site / make dev / make clean
+pyproject.toml    — uv project, all deps pinned ==x.y.z, Python pinned ===x.y.z
+.env              — EXA_API_KEY (gitignored)
+.site/            — build output dir (gitignored), served by make dev / GitHub Pages
+.site/data/*.json — pre-fetched restaurant data per city
+.github/workflows/deploy.yml — monthly fetch + deploy to GitHub Pages
 ```
 
-## Key decisions
+## How to run
 
-- All deps pinned to exact versions (==x.y.z)
-- Fetched data kept raw (tags as-is from Overpass); all formatting in browser JS
-- `foodie_urls` at top level of restaurant object (not inside `tags`)
-- Incremental foodie: skips restaurants already processed
-- Exa.ai keyword search for cost ($~8/full run) and native domain filtering
-- `truststore` for corporate proxy SSL
+```bash
+echo "EXA_API_KEY=your-key" > .env    # one-time setup
+make db                                # fetch restaurants + foodie URLs (~15min)
+make dev                               # serve on :8080 with file watching
+```
+
+## Makefile targets
+
+- `make db` — runs Overpass fetch then Exa foodie lookup. Fails if `.env` missing `EXA_API_KEY`.
+- `make site` — copies `cities.json` + `index.html` into `.site/`. Used by GitHub Actions.
+- `make dev` — depends on `site`. Watches `index.html`/`cities.json` for changes (via `fswatch`) and auto-copies. Serves `.site/` on port 8080.
+- `make clean` — removes `.site/`.
+
+## Data flow
+
+1. `fetch.py` queries Overpass API with each city's `bbox` → raw restaurant data with full OSM `tags`
+2. `fetch.py foodie` reads the saved JSON, queries Exa.ai for each named restaurant against the city's `foodie_sites`, adds `foodie_urls` to each restaurant object
+3. `make site` copies static assets into `.site/`
+4. `index.html` loads `cities.json` (for tabs) and `data/{key}.json` (for restaurants) — zero API calls at runtime
+
+## Data format in .site/data/{city}.json
+
+```json
+[
+  {
+    "id": 123456,
+    "lat": 40.76,
+    "lon": -73.98,
+    "tags": { "name": "...", "cuisine": "...", "addr:street": "...", ... },
+    "foodie_urls": ["https://ny.eater.com/..."]
+  }
+]
+```
+
+- `tags` is raw from Overpass (OSM tags, unmodified)
+- `foodie_urls` is at the top level (not inside `tags`), added by the foodie step
+- `foodie_urls` key absent = not yet checked. `[]` = checked, no results. `null` = error, retry next run.
+
+## Key conventions
+
+- **Pinned versions**: **zero tolerance for unpinned versions.** All Python deps use `==x.y.z`, Python itself uses `===x.y.z` in `requires-python`, and JS CDN libs are pinned to exact versions in the URL. No `>=`, `^`, `~`, `latest`, or unversioned references anywhere.
+- **Raw data**: `fetch.py` stores data as close to the API response as possible. All formatting (address assembly, cuisine semicolons→commas, etc.) happens in `index.html` JavaScript.
+- **Incremental foodie**: `fetch.py foodie` skips restaurants that already have a `foodie_urls` key, so re-runs only process new restaurants.
+- **SSL**: `truststore` is used to handle corporate proxy SSL interception.
+- **No framework**: single HTML file with inline CSS/JS, Leaflet via CDN. No build tools, no npm.
+
+## Frontend architecture (index.html)
+
+- City tabs dynamically built from `cities.json`
+- On city select: loads `data/{key}.json`, caches in memory
+- On pan/zoom (`moveend`): filters cached data to visible map bounds, re-renders markers + table
+- `t(r, key)` helper reads from `r.tags[key]` (raw format) or `r[key]` (legacy flat format)
+- "Foodie" pill toggle: when active, filters to `r.foodie_urls.length > 0`
+- `<meta name="last-updated">` populated by GitHub Actions at build time via `sed`
+
+## GitHub Actions
+
+- Runs monthly (1st of month, 6am UTC) or on manual dispatch
+- `EXA_API_KEY` passed via env (from workflow input or repo secret)
+- Runs `make db` → `make site`
+- Injects last-updated date into `index.html`
+- Deploys `.site/` to GitHub Pages
+
+## Adding a new city
+
+1. Add entry to `cities.json` with `key`, `name`, `lat`, `lng`, `zoom`, `bbox`, `foodie_sites`
+2. Run `make db` — it fetches restaurants and foodie URLs for all cities
+3. The frontend picks it up automatically (tabs built from `cities.json`)

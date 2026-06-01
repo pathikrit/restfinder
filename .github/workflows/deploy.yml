@@ -4,6 +4,10 @@ on:
   schedule:
     - cron: '0 6 1 * *'  # 1st of each month at 6am UTC
   workflow_dispatch:
+    inputs:
+      EXA_API_KEY:
+        description: 'Exa API key (falls back to repo secret)'
+        required: false
 
 permissions:
   contents: read
@@ -27,13 +31,12 @@ jobs:
         with:
           version: "latest"
 
-      - name: Create .env
-        run: echo "EXA_API_KEY=${{ secrets.EXA_API_KEY }}" > .env
-
       - run: make db
+        env:
+          EXA_API_KEY: ${{ inputs.EXA_API_KEY || secrets.EXA_API_KEY }}
 
       - name: Inject last-updated timestamp
-        run: sed -i 's/<meta name="last-updated" content="">/<meta name="last-updated" content="'"$(date -u +%Y-%m-%d)"'">/g' index.html
+        run: sed -i 's/\(name="last-updated" content="\)[^"]*/\1'"$(date -u +%Y-%m-%d)"'/' index.html
 
       - run: make site
 

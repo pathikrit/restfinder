@@ -3,6 +3,6 @@
 ## Run
 
 ```
-make fetch   # download restaurant data (~30s)
+make db      # fetch restaurants + foodie URLs
 make dev     # serve on http://localhost:8080
 ```
