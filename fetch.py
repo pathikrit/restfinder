@@ -22,7 +22,7 @@ SITE_DIR = ".site"
 DATA_DIR = os.path.join(SITE_DIR, "data")
 
 
-def fetch_city(city: dict) -> list[dict]:
+def fetch_city(city: dict, max_retries: int = 5) -> list[dict]:
     """Fetch restaurants for a city from the Overpass API."""
     bbox = city["bbox"]
     query = (
@@ -31,9 +31,19 @@ def fetch_city(city: dict) -> list[dict]:
         f'way["amenity"="restaurant"]({bbox["south"]},{bbox["west"]},{bbox["north"]},{bbox["east"]}););'
         f'out center;'
     )
-    resp = requests.post(OVERPASS_URL, data={"data": query}, timeout=120,
-                         headers={"User-Agent": "RestFinder/0.1"})
-    resp.raise_for_status()
+    for attempt in range(max_retries):
+        try:
+            resp = requests.post(OVERPASS_URL, data={"data": query}, timeout=120,
+                                 headers={"User-Agent": "RestFinder/0.1"})
+            resp.raise_for_status()
+            break
+        except requests.exceptions.RequestException as e:
+            if attempt < max_retries - 1:
+                wait = 15 * 2 ** attempt
+                print(f"  retry {attempt + 1}/{max_retries} in {wait}s: {e}")
+                time.sleep(wait)
+                continue
+            raise
     raw = resp.json()
 
     restaurants = []
@@ -57,15 +67,25 @@ def main():
 
     os.makedirs(DATA_DIR, exist_ok=True)
 
+    failed = []
     for i, city in enumerate(cities):
         print(f"Fetching {city['name']}...", flush=True)
-        restaurants = fetch_city(city)
+        try:
+            restaurants = fetch_city(city)
+        except Exception as e:
+            print(f"  FAILED: {e}")
+            failed.append(city["name"])
+            continue
         out_path = os.path.join(DATA_DIR, f"{city['key']}.json")
         with open(out_path, "w") as f:
             json.dump(restaurants, f)
         print(f"  {len(restaurants)} restaurants -> {out_path}")
         if i < len(cities) - 1:
             time.sleep(5)  # be nice to Overpass API
+
+    if failed:
+        print(f"\nWARNING: failed to fetch: {', '.join(failed)}", file=sys.stderr)
+        sys.exit(1)
 
     print("Done.")
 
@@ -77,15 +97,29 @@ def get_restaurant_name(r: dict) -> str:
 
 
 def fetch_urls(restaurant: str, city: str, foodie_sites: list[str], exa, max_retries: int = 3) -> list[str] | None:
+    from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
+
+    def _search():
+        return exa.search(
+            query=f"{restaurant} {city} restaurant",
+            type="keyword",
+            num_results=5,
+            include_domains=foodie_sites,
+        )
+
     for attempt in range(max_retries):
         try:
-            result = exa.search(
-                query=f"{restaurant} {city} restaurant",
-                type="keyword",
-                num_results=5,
-                include_domains=foodie_sites,
-            )
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                result = pool.submit(_search).result(timeout=30)
             return [r.url for r in result.results]
+        except FuturesTimeout:
+            if attempt < max_retries - 1:
+                wait = 2 ** attempt
+                print(f"    timeout, retry {attempt + 1}/{max_retries} in {wait}s")
+                time.sleep(wait)
+                continue
+            print(f"    FAILED after {max_retries} attempts: timeout")
+            return None
         except Exception as e:
             if attempt < max_retries - 1:
                 wait = 2 ** attempt
