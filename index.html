@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RestFinder — NYC Restaurants</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+        #map {
+            width: 100%;
+            height: 100vh;
+        }
+        #search-btn {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: 600;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            transition: background 0.2s;
+        }
+        #search-btn:hover {
+            background: #1d4ed8;
+        }
+        #search-btn:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+        #result-count {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            background: white;
+            padding: 8px 16px;
+            border-radius: 6px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            font-size: 14px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <button id="search-btn">Search Here</button>
+    <div id="result-count"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const MIN_ZOOM = 14;
+
+        const map = L.map('map').setView([40.7580, -73.9855], 14);
+
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        const markerLayer = L.layerGroup().addTo(map);
+        const searchBtn = document.getElementById('search-btn');
+        const resultCount = document.getElementById('result-count');
+
+        function buildQuery(bounds) {
+            const south = bounds.getSouth();
+            const west = bounds.getWest();
+            const north = bounds.getNorth();
+            const east = bounds.getEast();
+            const bbox = `${south},${west},${north},${east}`;
+            return `[out:json][timeout:10];(node["amenity"="restaurant"](${bbox});way["amenity"="restaurant"](${bbox}););out center;`;
+        }
+
+        async function searchRestaurants() {
+            if (map.getZoom() < MIN_ZOOM) {
+                resultCount.style.display = 'block';
+                resultCount.textContent = 'Please zoom in closer before searching.';
+                return;
+            }
+
+            searchBtn.disabled = true;
+            searchBtn.textContent = 'Searching\u2026';
+
+            const bounds = map.getBounds();
+            const query = buildQuery(bounds);
+            const url = 'https://overpass-api.de/api/interpreter';
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    body: `data=${encodeURIComponent(query)}`,
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Overpass API error: ${response.status}`);
+                }
+
+                const data = await response.json();
+                markerLayer.clearLayers();
+
+                const elements = data.elements || [];
+                elements.forEach(el => {
+                    const lat = el.lat || (el.center && el.center.lat);
+                    const lon = el.lon || (el.center && el.center.lon);
+                    if (!lat || !lon) return;
+
+                    const tags = el.tags || {};
+                    const name = tags.name || 'Unnamed restaurant';
+                    const cuisine = tags.cuisine || '';
+                    const street = tags['addr:street'] || '';
+                    const housenumber = tags['addr:housenumber'] || '';
+                    const phone = tags.phone || '';
+
+                    let popupHtml = `<strong>${name}</strong>`;
+                    if (cuisine) popupHtml += `<br>Cuisine: ${cuisine}`;
+                    if (street) popupHtml += `<br>${housenumber ? housenumber + ' ' : ''}${street}`;
+                    if (phone) popupHtml += `<br>${phone}`;
+
+                    L.marker([lat, lon]).bindPopup(popupHtml).addTo(markerLayer);
+                });
+
+                resultCount.style.display = 'block';
+                resultCount.textContent = `${elements.length} restaurant${elements.length !== 1 ? 's' : ''} found`;
+
+            } catch (err) {
+                console.error(err);
+                resultCount.style.display = 'block';
+                resultCount.textContent = 'Failed to fetch restaurants. Please try again.';
+            } finally {
+                searchBtn.disabled = false;
+                searchBtn.textContent = 'Search Here';
+            }
+        }
+
+        searchBtn.addEventListener('click', searchRestaurants);
+    </script>
+</body>
+</html>
