@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Fetch restaurant data from Overpass API for all cities defined in cities.json."""
+"""Fetch restaurant data from Overpass API and foodie URLs from Exa.ai."""
 
 import json
 import os
+import sys
 import time
 
 import truststore
@@ -15,15 +16,19 @@ SITE_DIR = ".site"
 DATA_DIR = os.path.join(SITE_DIR, "data")
 
 
+# ---------------------------------------------------------------------------
+# Overpass: fetch restaurants
+# ---------------------------------------------------------------------------
+
 def fetch_city(city: dict) -> list[dict]:
     bbox = city["bbox"]
     query = (
-        f'[out:json][timeout:30];'
+        f'[out:json][timeout:60];'
         f'(node["amenity"="restaurant"]({bbox["south"]},{bbox["west"]},{bbox["north"]},{bbox["east"]});'
         f'way["amenity"="restaurant"]({bbox["south"]},{bbox["west"]},{bbox["north"]},{bbox["east"]}););'
         f'out center;'
     )
-    resp = requests.post(OVERPASS_URL, data={"data": query}, timeout=60,
+    resp = requests.post(OVERPASS_URL, data={"data": query}, timeout=120,
                          headers={"User-Agent": "RestFinder/0.1"})
     resp.raise_for_status()
     raw = resp.json()
@@ -34,20 +39,11 @@ def fetch_city(city: dict) -> list[dict]:
         lon = el.get("lon") or (el.get("center") or {}).get("lon")
         if not lat or not lon:
             continue
-        tags = el.get("tags", {})
-        housenumber = tags.get("addr:housenumber", "")
-        street = tags.get("addr:street", "")
-        address = f"{housenumber} {street}".strip()
         restaurants.append({
             "id": el["id"],
             "lat": lat,
             "lon": lon,
-            "name": tags.get("name", "Unnamed"),
-            "cuisine": tags.get("cuisine", "").replace(";", ", "),
-            "address": address,
-            "phone": tags.get("phone", ""),
-            "website": tags.get("website", ""),
-            "hours": tags.get("opening_hours", ""),
+            "tags": el.get("tags", {}),
         })
     return restaurants
 
@@ -71,5 +67,106 @@ def main():
     print("Done.")
 
 
+# ---------------------------------------------------------------------------
+# Exa: fetch foodie URLs
+# ---------------------------------------------------------------------------
+
+def get_restaurant_name(r: dict) -> str:
+    if "tags" in r:
+        return r["tags"].get("name", "")
+    return r.get("name", "")
+
+
+def fetch_urls(restaurant: str, city: str, foodie_sites: list[str], exa, max_retries: int = 3) -> list[str] | None:
+    for attempt in range(max_retries):
+        try:
+            result = exa.search(
+                query=f"{restaurant} {city} restaurant",
+                type="keyword",
+                num_results=5,
+                include_domains=foodie_sites,
+            )
+            return [r.url for r in result.results]
+        except Exception as e:
+            if attempt < max_retries - 1:
+                wait = 2 ** attempt
+                print(f"    retry {attempt + 1}/{max_retries} in {wait}s: {e}")
+                time.sleep(wait)
+                continue
+            print(f"    FAILED after {max_retries} attempts: {e}")
+            return None
+
+
+def foodie_main():
+    from dotenv import load_dotenv
+    from exa_py import Exa
+
+    load_dotenv()
+    api_key = os.environ.get("EXA_API_KEY")
+    if not api_key:
+        print("Error: set EXA_API_KEY in .env", file=sys.stderr)
+        sys.exit(1)
+
+    exa = Exa(api_key=api_key)
+
+    with open("cities.json") as f:
+        cities = json.load(f)
+
+    for city in cities:
+        foodie_sites = city.get("foodie_sites", [])
+        if not foodie_sites:
+            print(f"Skipping {city['name']}: no foodie_sites configured")
+            continue
+
+        data_path = os.path.join(DATA_DIR, f"{city['key']}.json")
+        if not os.path.exists(data_path):
+            print(f"Skipping {city['name']}: {data_path} not found (run make fetch first)")
+            continue
+
+        with open(data_path) as f:
+            restaurants = json.load(f)
+
+        updated = 0
+        skipped = 0
+        total = len(restaurants)
+
+        print(f"\n{city['name']} ({total} restaurants)...", flush=True)
+
+        for i, r in enumerate(restaurants):
+            if "foodie_urls" in r:
+                skipped += 1
+                continue
+
+            name = get_restaurant_name(r).strip()
+            if not name:
+                r["foodie_urls"] = []
+                continue
+
+            urls = fetch_urls(name, city["name"], foodie_sites, exa)
+            r["foodie_urls"] = urls if urls is not None else None
+            updated += 1
+
+            if urls:
+                print(f"  [{updated}] {name}: {len(urls)} URLs")
+
+            time.sleep(0.2)
+
+            if updated > 0 and updated % 50 == 0:
+                with open(data_path, "w") as f:
+                    json.dump(restaurants, f)
+                print(f"  ... checkpoint ({updated}/{total - skipped} searched)")
+
+        with open(data_path, "w") as f:
+            json.dump(restaurants, f)
+
+        found = sum(1 for r in restaurants if r.get("foodie_urls"))
+        print(f"  {updated} searched, {skipped} skipped, {found} with foodie URLs")
+
+    print("\nDone.")
+
+
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) > 1 and sys.argv[1] == "foodie":
+        foodie_main()
+    else:
+        main()

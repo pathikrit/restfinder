@@ -3,4 +3,9 @@ name = "restfinder"
 version = "0.1.0"
 description = "Find restaurants on a map"
 requires-python = ">=3.11"
-dependencies = ["requests>=2.32", "truststore>=0.10"]
+dependencies = [
+    "requests==2.34.2",
+    "truststore==0.10.4",
+    "exa-py==2.13.0",
+    "python-dotenv==1.2.2",
+]

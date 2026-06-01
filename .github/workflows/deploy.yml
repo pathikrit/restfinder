@@ -2,7 +2,7 @@ name: Fetch & Deploy
 
 on:
   schedule:
-    - cron: '0 6 * * *'  # daily at 6am UTC
+    - cron: '0 6 1 * *'  # 1st of each month at 6am UTC
   workflow_dispatch:
 
 permissions:
@@ -27,7 +27,13 @@ jobs:
         with:
           version: "latest"
 
-      - run: make fetch
+      - name: Create .env
+        run: echo "EXA_API_KEY=${{ secrets.EXA_API_KEY }}" > .env
+
+      - run: make db
+
+      - name: Inject last-updated timestamp
+        run: sed -i 's/<meta name="last-updated" content="">/<meta name="last-updated" content="'"$(date -u +%Y-%m-%d)"'">/g' index.html
 
       - run: make site
 

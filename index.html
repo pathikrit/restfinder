@@ -3,8 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="last-updated" content="">
     <title>RestFinder</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+    <link rel="stylesheet" href="https://kit.fontawesome.com/a22be8527e.css" crossorigin="anonymous">
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #e2e8f0; }
@@ -29,11 +31,49 @@
         #city-tabs button:hover { color: #cbd5e1; }
         #city-tabs button.active { color: #f1f5f9; border-bottom-color: #3b82f6; }
 
+        #github-link {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            padding: 0 14px;
+            color: #64748b;
+            font-size: 20px;
+            transition: color 0.15s;
+        }
+        #github-link:hover { color: #f1f5f9; }
+
+        #filters {
+            display: flex;
+            align-items: center;
+            padding: 6px 12px;
+            background: #0f172a;
+            border-bottom: 1px solid #1e293b;
+            gap: 8px;
+        }
+        .pill {
+            padding: 4px 14px;
+            border-radius: 9999px;
+            border: 1px solid #334155;
+            background: none;
+            color: #64748b;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .pill:hover { border-color: #f59e0b; color: #fbbf24; }
+        .pill.active { background: #451a03; border-color: #f59e0b; color: #fbbf24; }
+        #last-updated {
+            margin-left: auto;
+            color: #475569;
+            font-size: 11px;
+        }
+
         #map-wrap { position: relative; height: 50%; }
         #map { width: 100%; height: 100%; }
 
         #table-wrap {
-            height: calc(50% - 42px);
+            height: calc(50% - 72px);
             overflow-y: auto;
             background: #0f172a;
         }
@@ -68,6 +108,7 @@
         #table-wrap tr.data-row.selected { background: #1e3a5f; }
         #table-wrap td a { color: #60a5fa; text-decoration: none; }
         #table-wrap td a:hover { text-decoration: underline; }
+        #table-wrap td a.foodie-link { color: #f59e0b; }
         #placeholder {
             display: flex;
             align-items: center;
@@ -76,11 +117,14 @@
             color: #475569;
             font-size: 15px;
         }
-        /* Keep default light popups to match OSM tiles */
     </style>
 </head>
 <body>
-    <nav id="city-tabs"></nav>
+    <nav id="city-tabs"><a href="https://github.com/pathikrit/restfinder" target="_blank" rel="noopener" id="github-link"><i class="fa-brands fa-github"></i></a></nav>
+    <div id="filters">
+        <button id="foodie-toggle" class="pill">Foodie</button>
+        <span id="last-updated"></span>
+    </div>
     <div id="map-wrap">
         <div id="map"></div>
     </div>
@@ -104,6 +148,20 @@
         let activeCity = null;
         let cityData = {};
         let markers = {};
+        let foodieFilter = false;
+
+        // --- Last updated ---
+        const updatedMeta = document.querySelector('meta[name="last-updated"]');
+        if (updatedMeta && updatedMeta.content) {
+            document.getElementById('last-updated').textContent = 'Updated: ' + updatedMeta.content;
+        }
+
+        // --- Foodie toggle ---
+        document.getElementById('foodie-toggle').addEventListener('click', function() {
+            foodieFilter = !foodieFilter;
+            this.classList.toggle('active', foodieFilter);
+            updateView();
+        });
 
         function esc(s) {
             const d = document.createElement('div');
@@ -148,24 +206,69 @@
             cityData[key] = await resp.json();
         }
 
+        // --- Extract fields from raw tags (or legacy flat format) ---
+        function t(r, key) {
+            if (r.tags) return r.tags[key] || '';
+            return r[key] || '';
+        }
+
+        function formatAddress(r) {
+            const tags = r.tags || {};
+            if (r.tags) {
+                return [tags['addr:housenumber'], tags['addr:street'], tags['addr:city'], tags['addr:state'], tags['addr:postcode']]
+                    .filter(Boolean).join(' ');
+            }
+            return r.address || '';
+        }
+
+        function formatCuisine(r) {
+            return t(r, 'cuisine').replace(/;/g, ', ');
+        }
+
+        function formatHours(r) {
+            return r.tags ? t(r, 'opening_hours') : t(r, 'hours');
+        }
+
+        function formatFoodieLinks(urls) {
+            if (!urls || !urls.length) return '';
+            return urls.map(url => {
+                const domain = new URL(url).hostname.replace(/^www\./, '');
+                return `<a href="${esc(url)}" target="_blank" rel="noopener" class="foodie-link">${esc(domain)}</a>`;
+            }).join(', ');
+        }
+
         // --- Filter to visible bounds and render ---
         function updateView() {
             if (!activeCity || !cityData[activeCity]) return;
             const bounds = map.getBounds();
-            const visible = cityData[activeCity].filter(r =>
+            let visible = cityData[activeCity].filter(r =>
                 r.lat >= bounds.getSouth() && r.lat <= bounds.getNorth() &&
                 r.lon >= bounds.getWest() && r.lon <= bounds.getEast()
             );
 
+            if (foodieFilter) {
+                visible = visible.filter(r => r.foodie_urls && r.foodie_urls.length > 0);
+            }
+
             markerLayer.clearLayers();
             markers = {};
             visible.forEach(r => {
-                let popup = `<strong>${esc(r.name)}</strong>`;
-                if (r.cuisine) popup += `<br>${esc(r.cuisine)}`;
-                if (r.address) popup += `<br><address style="font-style:normal;display:inline">${esc(r.address)}</address>`;
-                if (r.phone) popup += `<br><a href="tel:${esc(r.phone)}">${esc(r.phone)}</a>`;
-                if (r.website) popup += `<br><a href="${esc(r.website)}" target="_blank" rel="noopener">${esc(r.website.replace(/^https?:\/\//, ''))}</a>`;
-                if (r.hours) popup += `<br>${esc(r.hours)}`;
+                const name = t(r, 'name') || 'Unnamed';
+                const cuisine = formatCuisine(r);
+                const address = formatAddress(r);
+                const phone = t(r, 'phone');
+                const website = t(r, 'website');
+                const hours = formatHours(r);
+
+                let popup = `<strong>${esc(name)}</strong>`;
+                if (cuisine) popup += `<br>${esc(cuisine)}`;
+                if (address) popup += `<br><i class="fa-solid fa-location-dot"></i> <address style="font-style:normal;display:inline">${esc(address)}</address>`;
+                if (phone) popup += `<br><i class="fa-solid fa-phone"></i> <a href="tel:${esc(phone)}">${esc(phone)}</a>`;
+                if (website) popup += `<br><a href="${esc(website)}" target="_blank" rel="noopener">Website</a>`;
+                if (hours) popup += `<br>${esc(hours)}`;
+                if (r.foodie_urls && r.foodie_urls.length) {
+                    popup += `<br><strong style="color:#f59e0b">Foodie:</strong> ${formatFoodieLinks(r.foodie_urls)}`;
+                }
                 const m = L.marker([r.lat, r.lon]).bindPopup(popup);
                 m.addTo(markerLayer);
                 markers[r.id] = m;
@@ -178,18 +281,26 @@
 
             let html = `<table><thead><tr>
                 <th>#</th><th>Name</th><th>Cuisine</th><th>Address</th>
-                <th>Phone</th><th>Hours</th><th>Website</th>
+                <th>Phone</th><th>Hours</th><th>Website</th><th>Foodie</th>
                 </tr></thead><tbody>`;
             visible.forEach((r, i) => {
-                const site = r.website ? `<a href="${esc(r.website)}" target="_blank" rel="noopener">link</a>` : '';
+                const name = t(r, 'name') || 'Unnamed';
+                const cuisine = formatCuisine(r);
+                const address = formatAddress(r);
+                const phone = t(r, 'phone');
+                const website = t(r, 'website');
+                const hours = formatHours(r);
+                const site = website ? `<a href="${esc(website)}" target="_blank" rel="noopener">link</a>` : '';
+                const foodie = formatFoodieLinks(r.foodie_urls);
                 html += `<tr class="data-row" data-id="${r.id}" data-lat="${r.lat}" data-lon="${r.lon}">
                     <td>${i + 1}</td>
-                    <td title="${esc(r.name)}">${esc(r.name)}</td>
-                    <td title="${esc(r.cuisine)}">${esc(r.cuisine)}</td>
-                    <td>${esc(r.address)}</td>
-                    <td>${esc(r.phone)}</td>
-                    <td title="${esc(r.hours)}">${esc(r.hours)}</td>
-                    <td>${site}</td></tr>`;
+                    <td title="${esc(name)}">${esc(name)}</td>
+                    <td title="${esc(cuisine)}">${esc(cuisine)}</td>
+                    <td title="${esc(address)}">${esc(address)}</td>
+                    <td>${esc(phone)}</td>
+                    <td title="${esc(hours)}">${esc(hours)}</td>
+                    <td>${site}</td>
+                    <td>${foodie}</td></tr>`;
             });
             html += '</tbody></table>';
             tableWrap.innerHTML = html;
