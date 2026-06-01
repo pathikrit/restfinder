@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="last-updated" content="">
-    <title>RestFinder</title>
+    <title>Restaurant Finder</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍴</text></svg>">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
     <link rel="stylesheet" href="https://kit.fontawesome.com/a22be8527e.css" crossorigin="anonymous">
     <style>
@@ -191,6 +192,21 @@
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         }).addTo(map);
 
+        L.Control.ResetView = L.Control.extend({
+            onAdd() {
+                const btn = L.DomUtil.create('div', 'leaflet-bar');
+                btn.innerHTML = '<a href="#" title="Reset view" style="font-size:16px;display:flex;align-items:center;justify-content:center;width:30px;height:30px"><i class="fa-solid fa-house"></i></a>';
+                btn.querySelector('a').addEventListener('click', e => {
+                    e.preventDefault();
+                    const city = cities.find(c => c.key === activeCity);
+                    if (city) map.setView([city.lat, city.lng], city.zoom);
+                });
+                L.DomEvent.disableClickPropagation(btn);
+                return btn;
+            }
+        });
+        new L.Control.ResetView({ position: 'topleft' }).addTo(map);
+
         const markerLayer = L.layerGroup().addTo(map);
         const tableWrap = document.getElementById('table-wrap');
         const tabsNav = document.getElementById('city-tabs');
@@ -352,7 +368,7 @@
             const filterInput = (key) => `<div class="col-filter"><input type="text" data-filter="${key}" placeholder="Filter..." value="${esc(colFilters[key])}"><button class="clear-btn" data-clear="${key}">&times;</button></div>`;
             let html = `<table><thead><tr>
                 <th>#</th><th>Name${filterInput('name')}</th><th>Cuisine${filterInput('cuisine')}</th><th>Address${filterInput('address')}</th>
-                <th>Phone</th><th>Hours</th><th>Website</th><th>Mentions${foodieToggleHtml}</th>
+                <th>Phone</th><th>Hours</th><th>Mentions${foodieToggleHtml}</th>
                 </tr></thead><tbody>`;
             visible.forEach((r, i) => {
                 const name = t(r, 'name') || 'Unnamed';
@@ -361,20 +377,19 @@
                 const phone = t(r, 'phone');
                 const website = t(r, 'website');
                 const hours = formatHours(r);
-                const site = website ? `<a href="${esc(website)}" target="_blank" rel="noopener">link</a>` : '';
                 const foodie = formatFoodieLinks(r.foodie_urls);
+                const nameHtml = website ? `<a href="${esc(website)}" target="_blank" rel="noopener">${esc(name)}</a>` : esc(name);
                 html += `<tr class="data-row" data-id="${r.id}" data-lat="${r.lat}" data-lon="${r.lon}">
                     <td>${i + 1}</td>
-                    <td title="${esc(name)}">${esc(name)}</td>
+                    <td title="${esc(name)}">${nameHtml}</td>
                     <td title="${esc(cuisine)}">${esc(cuisine)}</td>
                     <td title="${esc(address)}"><address style="font-style:normal">${esc(address)}</address></td>
                     <td>${phone ? `<a href="tel:${esc(phone)}">${esc(phone)}</a>` : ''}</td>
                     <td title="${esc(hours)}">${esc(hours)}</td>
-                    <td>${site}</td>
                     <td>${foodie}</td></tr>`;
             });
             if (visible.length === 0) {
-                html += `<tr><td colspan="8" style="text-align:center;color:#475569;padding:20px">No matching restaurants.</td></tr>`;
+                html += `<tr><td colspan="7" style="text-align:center;color:#475569;padding:20px">No matching restaurants.</td></tr>`;
             }
             html += '</tbody></table>';
             const activeFilter = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.filter;
