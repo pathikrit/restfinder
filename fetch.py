@@ -102,9 +102,10 @@ def fetch_urls(restaurant: str, city: str, foodie_sites: list[str], exa, max_ret
     def _search():
         return exa.search(
             query=f"{restaurant} {city} restaurant",
-            type="keyword",
+            type="instant",
             num_results=5,
             include_domains=foodie_sites,
+            system_prompt="Restaurant highlights & recommendations in foodie sites; prefer atmost 1 result per site in includeDomains",
         )
 
     for attempt in range(max_retries):
@@ -161,14 +162,14 @@ def foodie_main():
             restaurants = json.load(f)
 
         updated = 0
-        skipped = 0
+        skipped = sum(1 for r in restaurants if "foodie_urls" in r)
+        to_search = sum(1 for r in restaurants if "foodie_urls" not in r and get_restaurant_name(r).strip())
         total = len(restaurants)
 
-        print(f"\n{city['name']} ({total} restaurants)...", flush=True)
+        print(f"\n{city['name']} ({total} restaurants, {to_search} to search, {skipped} already done)...", flush=True)
 
         for i, r in enumerate(restaurants):
             if "foodie_urls" in r:
-                skipped += 1
                 continue
 
             name = get_restaurant_name(r).strip()
@@ -180,15 +181,13 @@ def foodie_main():
             r["foodie_urls"] = urls if urls is not None else None
             updated += 1
 
-            if urls:
-                print(f"  [{updated}] {name}: {len(urls)} URLs")
-
             time.sleep(0.2)
 
-            if updated > 0 and updated % 50 == 0:
+            if updated % 100 == 0:
                 with open(data_path, "w") as f:
                     json.dump(restaurants, f)
-                print(f"  ... checkpoint ({updated}/{total - skipped} searched)")
+                found_so_far = sum(1 for r in restaurants if r.get("foodie_urls"))
+                print(f"  ... checkpoint {updated}/{to_search} searched, {found_so_far} with URLs so far", flush=True)
 
         with open(data_path, "w") as f:
             json.dump(restaurants, f)
