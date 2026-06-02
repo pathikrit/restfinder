@@ -161,8 +161,6 @@ def foodie_main(quick: bool = False):
             r["foodie_urls"] = urls if urls is not None else None
             updated += 1
 
-            time.sleep(0.2)
-
             if updated % 100 == 0:
                 with open(data_path, "w") as f:
                     json.dump(restaurants, f)
