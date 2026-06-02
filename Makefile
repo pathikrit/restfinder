@@ -8,20 +8,20 @@ PAGES_URL := https://pathikrit.github.io/restfinder
 db-copy:
 	@mkdir -p .site/data
 	@unset SSL_CERT_FILE REQUESTS_CA_BUNDLE; \
-	python3 -c "import json; [print(c['key']) for c in json.load(open('cities.json'))]" | \
+	python3 -c "import json; [print(c['key']) for c in json.load(open('cities.json')) if c.get('enabled', True)]" | \
 		while read key; do \
 			echo "Downloading $$key..."; \
 			curl -sSf "$(PAGES_URL)/data/$$key.json" -o ".site/data/$$key.json"; \
 		done
 	@echo "Done."
 
-db-smoketest: check-keys
-	uv run fetch.py --quick
-	uv run fetch.py foodie --quick
+db-smoketest:
+	uv run fetcher.py --quick
+	uv run foodie.py --quick
 
 db: check-keys
-	uv run fetch.py
-	uv run fetch.py foodie
+	uv run fetcher.py
+	uv run foodie.py
 
 site:
 	mkdir -p .site

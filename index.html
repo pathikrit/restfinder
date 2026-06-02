@@ -31,6 +31,8 @@
         }
         #city-tabs button:hover { color: #cbd5e1; }
         #city-tabs button.active { color: #f1f5f9; border-bottom-color: #3b82f6; }
+        #city-tabs button:disabled { color: #334155; cursor: not-allowed; }
+        #city-tabs button:disabled:hover { color: #334155; }
 
         #github-link {
             display: flex;
@@ -225,14 +227,19 @@
         }
 
         // --- Load cities.json and bootstrap ---
-        fetch('cities.json').then(r => r.json()).then(data => {
-            cities = data.filter(c => c.enabled !== false);
+        fetch('cities.json').then(r => r.json()).then(allCities => {
+            cities = allCities.filter(c => c.enabled !== false);
             const lastUpdated = document.getElementById('last-updated');
-            cities.forEach(city => {
+            allCities.forEach(city => {
                 const btn = document.createElement('button');
                 btn.textContent = city.name;
                 btn.dataset.key = city.key;
-                btn.addEventListener('click', () => selectCity(city.key));
+                if (city.enabled !== false) {
+                    btn.addEventListener('click', () => selectCity(city.key));
+                } else {
+                    btn.disabled = true;
+                    btn.title = 'Coming soon';
+                }
                 tabsNav.insertBefore(btn, lastUpdated);
             });
             const ghLink = document.createElement('a');
@@ -287,30 +294,6 @@
             cityData[key] = data;
         }
 
-        // --- Extract fields from raw tags (or legacy flat format) ---
-        function t(r, key) {
-            if (r.tags) return r.tags[key] || '';
-            return r[key] || '';
-        }
-
-        function formatAddress(r) {
-            const tags = r.tags || {};
-            if (r.tags) {
-                return [tags['addr:housenumber'], tags['addr:street'], tags['addr:city'], tags['addr:state'], tags['addr:postcode']]
-                    .filter(Boolean).join(' ');
-            }
-            return r.address || '';
-        }
-
-        function formatCuisine(r) {
-            return t(r, 'cuisine').replace(/;/g, ', ').replace(/_/g, ' ')
-                .replace(/\b\w/g, c => c.toUpperCase());
-        }
-
-        function formatHours(r) {
-            return r.tags ? t(r, 'opening_hours') : t(r, 'hours');
-        }
-
         function formatFoodieLinks(urls) {
             if (!urls || !urls.length) return '';
             return urls.map(url => {
@@ -339,31 +322,29 @@
 
             if (colFilters.name) {
                 const q = colFilters.name.toLowerCase();
-                visible = visible.filter(r => (t(r, 'name') || '').toLowerCase().includes(q));
+                visible = visible.filter(r => (r.name || '').toLowerCase().includes(q));
             }
             if (colFilters.cuisine) {
                 const q = colFilters.cuisine.toLowerCase();
-                visible = visible.filter(r => formatCuisine(r).toLowerCase().includes(q));
+                visible = visible.filter(r => (r.cuisine || '').toLowerCase().includes(q));
             }
             if (colFilters.address) {
                 const q = colFilters.address.toLowerCase();
-                visible = visible.filter(r => formatAddress(r).toLowerCase().includes(q));
+                visible = visible.filter(r => (r.address || '').toLowerCase().includes(q));
             }
 
             markerLayer.clearLayers();
             markers = {};
             visible.forEach(r => {
-                const name = t(r, 'name') || 'Unnamed';
-                const cuisine = formatCuisine(r);
-                const address = formatAddress(r);
-                const phone = t(r, 'phone');
-                const website = t(r, 'website');
+                const name = r.name || 'Unnamed';
+                const cuisine = r.cuisine || '';
+                const address = r.address || '';
+                const phone = r.phone || '';
 
                 let popup = `<strong>${esc(name)}</strong>`;
                 if (cuisine) popup += `<br>${esc(cuisine)}`;
                 if (address) popup += `<br><i class="fa-solid fa-location-dot"></i> <address style="font-style:normal;display:inline">${esc(address)}</address>`;
                 if (phone) popup += `<br><i class="fa-solid fa-phone"></i> <a href="tel:${esc(phone)}">${esc(phone)}</a>`;
-                if (website) popup += `<br><a href="${esc(website)}" target="_blank" rel="noopener">Website</a>`;
                 if (r.foodie_urls && r.foodie_urls.length) {
                     popup += `<br><strong style="color:#f59e0b">Mentions:</strong> ${formatFoodieLinks(r.foodie_urls)}`;
                 }
@@ -379,28 +360,24 @@
             const filterInput = (key) => `<div class="col-filter"><input type="text" data-filter="${key}" placeholder="Filter..." value="${esc(colFilters[key])}"><button class="clear-btn" data-clear="${key}">&times;</button></div>`;
             let html = `<table><thead><tr>
                 <th>#</th><th>Name${filterInput('name')}</th><th>Cuisine${filterInput('cuisine')}</th><th>Address${filterInput('address')}</th>
-                <th>Phone</th><th>Hours</th><th>Mentions${foodieChecksHtml}</th>
+                <th>Phone</th><th>Mentions${foodieChecksHtml}</th>
                 </tr></thead><tbody>`;
             visible.forEach((r, i) => {
-                const name = t(r, 'name') || 'Unnamed';
-                const cuisine = formatCuisine(r);
-                const address = formatAddress(r);
-                const phone = t(r, 'phone');
-                const website = t(r, 'website');
-                const hours = formatHours(r);
+                const name = r.name || 'Unnamed';
+                const cuisine = r.cuisine || '';
+                const address = r.address || '';
+                const phone = r.phone || '';
                 const foodie = formatFoodieLinks(r.foodie_urls);
-                const nameHtml = website ? `<a href="${esc(website)}" target="_blank" rel="noopener">${esc(name)}</a>` : esc(name);
                 html += `<tr class="data-row" data-id="${r.id}" data-lat="${r.lat}" data-lon="${r.lon}">
                     <td>${i + 1}</td>
-                    <td title="${esc(name)}">${nameHtml}</td>
+                    <td title="${esc(name)}">${esc(name)}</td>
                     <td title="${esc(cuisine)}">${esc(cuisine)}</td>
                     <td title="${esc(address)}"><address style="font-style:normal">${esc(address)}</address></td>
                     <td>${phone ? `<a href="tel:${esc(phone)}">${esc(phone)}</a>` : ''}</td>
-                    <td title="${esc(hours)}">${esc(hours)}</td>
                     <td>${foodie}</td></tr>`;
             });
             if (visible.length === 0) {
-                html += `<tr><td colspan="7" style="text-align:center;color:#475569;padding:20px">No matching restaurants.</td></tr>`;
+                html += `<tr><td colspan="6" style="text-align:center;color:#475569;padding:20px">No matching restaurants.</td></tr>`;
             }
             html += '</tbody></table>';
             const activeFilter = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.filter;
@@ -438,7 +415,7 @@
                     row.classList.add('selected');
                     const lat = parseFloat(row.dataset.lat);
                     const lon = parseFloat(row.dataset.lon);
-                    const id = parseInt(row.dataset.id);
+                    const id = row.dataset.id;
                     map.setView([lat, lon], 18);
                     if (markers[id]) markers[id].openPopup();
                 });
