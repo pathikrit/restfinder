@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Augment restaurant data with foodie URLs from Exa.ai."""
+"""Augment restaurant data with foodie URLs from Serper.dev (Google Search API)."""
 
 import json
 import os
@@ -13,56 +13,54 @@ for _var in ("SSL_CERT_FILE", "REQUESTS_CA_BUNDLE"):
     if os.environ.get(_var) in (None, "", "None"):
         os.environ.pop(_var, None)
 
+import requests  # noqa: E402
+
 SITE_DIR = ".site"
 DATA_DIR = os.path.join(SITE_DIR, "data")
+SERPER_URL = "https://google.serper.dev/search"
+BATCH_SIZE = 100
 
 
-def fetch_urls(restaurant: str, city: str, foodie_sites: list[str], exa, max_retries: int = 3) -> list[str] | None:
-    from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
+def build_query(name: str, city: str, foodie_sites: list[str]) -> str:
+    sites = " OR ".join(foodie_sites)
+    return f'"{name}" restaurant {city} site:({sites})'
 
-    def _search():
-        return exa.search(
-            query=f'"{restaurant}" {city} restaurant',
-            type="instant",
-            num_results=5,
-            include_domains=foodie_sites,
-            system_prompt="Restaurant highlights & recommendations in foodie sites; prefer atmost 1 result per site in includeDomains",
-        )
 
+def search_batch(queries: list[dict], api_key: str, max_retries: int = 3) -> list[dict]:
+    """Send a batch of queries to Serper and return results."""
+    headers = {
+        "X-API-KEY": api_key,
+        "Content-Type": "application/json",
+    }
     for attempt in range(max_retries):
         try:
-            with ThreadPoolExecutor(max_workers=1) as pool:
-                result = pool.submit(_search).result(timeout=30)
-            return [r.url for r in result.results]
-        except FuturesTimeout:
-            if attempt < max_retries - 1:
-                wait = 2 ** attempt
-                print(f"    timeout, retry {attempt + 1}/{max_retries} in {wait}s")
-                time.sleep(wait)
-                continue
-            print(f"    FAILED after {max_retries} attempts: timeout")
-            return None
+            resp = requests.post(SERPER_URL, json=queries, headers=headers, timeout=60)
+            resp.raise_for_status()
+            results = resp.json()
+            # Single query returns a dict, batch returns a list
+            return results if isinstance(results, list) else [results]
         except Exception as e:
             if attempt < max_retries - 1:
                 wait = 2 ** attempt
-                print(f"    retry {attempt + 1}/{max_retries} in {wait}s: {e}")
+                print(f"  retry {attempt + 1}/{max_retries} in {wait}s: {e}")
                 time.sleep(wait)
                 continue
-            print(f"    FAILED after {max_retries} attempts: {e}")
-            return None
+            raise
+
+
+def extract_urls(result: dict) -> list[str]:
+    """Extract URLs from a Serper search result."""
+    return [item["link"] for item in result.get("organic", []) if item.get("link")]
 
 
 def main(quick: bool = False):
     from dotenv import load_dotenv
-    from exa_py import Exa
 
     load_dotenv()
-    api_key = os.environ.get("EXA_API_KEY")
+    api_key = os.environ.get("SERPER_API_KEY")
     if not api_key:
-        print("Error: set EXA_API_KEY in .env", file=sys.stderr)
+        print("Error: set SERPER_API_KEY in .env", file=sys.stderr)
         sys.exit(1)
-
-    exa = Exa(api_key=api_key)
 
     with open("cities.json") as f:
         cities = [c for c in json.load(f) if c.get("enabled", True)]
@@ -84,39 +82,43 @@ def main(quick: bool = False):
         with open(data_path) as f:
             restaurants = json.load(f)
 
-        updated = 0
-        skipped = sum(1 for r in restaurants if "foodie_urls" in r)
-        to_search = sum(1 for r in restaurants if "foodie_urls" not in r and (r.get("name") or "").strip())
-        total = len(restaurants)
-
-        print(f"\n{city['name']} ({total} restaurants, {to_search} to search, {skipped} already done)...", flush=True)
-
+        # Collect restaurants needing search
+        to_search = []
         for i, r in enumerate(restaurants):
             if "foodie_urls" in r:
                 continue
-
             name = (r.get("name") or "").strip()
             if not name:
                 r["foodie_urls"] = []
                 continue
+            to_search.append((i, name))
 
-            urls = fetch_urls(name, city["name"], foodie_sites, exa)
-            r["foodie_urls"] = urls if urls is not None else None
-            updated += 1
+        skipped = sum(1 for r in restaurants if "foodie_urls" in r)
+        total = len(restaurants)
+        print(f"\n{city['name']} ({total} restaurants, {len(to_search)} to search, {skipped} already done)...", flush=True)
 
-            time.sleep(0.2)
+        searched = 0
+        for batch_start in range(0, len(to_search), BATCH_SIZE):
+            batch = to_search[batch_start:batch_start + BATCH_SIZE]
+            queries = [{"q": build_query(name, city["name"], foodie_sites), "num": 5} for _, name in batch]
 
-            if updated % 100 == 0:
-                with open(data_path, "w") as f:
-                    json.dump(restaurants, f)
-                found_so_far = sum(1 for r in restaurants if r.get("foodie_urls"))
-                print(f"  ... checkpoint {updated}/{to_search} searched, {found_so_far} with URLs so far", flush=True)
+            try:
+                results = search_batch(queries, api_key)
+                for (idx, _), result in zip(batch, results):
+                    restaurants[idx]["foodie_urls"] = extract_urls(result)
+            except Exception as e:
+                print(f"  FAILED batch at {batch_start}: {e}")
+                for idx, _ in batch:
+                    restaurants[idx]["foodie_urls"] = None
 
-        with open(data_path, "w") as f:
-            json.dump(restaurants, f)
+            searched += len(batch)
+            with open(data_path, "w") as f:
+                json.dump(restaurants, f)
+            found_so_far = sum(1 for r in restaurants if r.get("foodie_urls"))
+            print(f"  ... {searched}/{len(to_search)} searched, {found_so_far} with URLs", flush=True)
 
         found = sum(1 for r in restaurants if r.get("foodie_urls"))
-        print(f"  {updated} searched, {skipped} skipped, {found} with foodie URLs")
+        print(f"  {searched} searched, {skipped} skipped, {found} with foodie URLs")
 
     print("\nDone.")
 
