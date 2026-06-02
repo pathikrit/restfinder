@@ -4,7 +4,8 @@
 import json
 import os
 import sys
-import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from urllib.parse import urlparse
 
 import truststore
 truststore.inject_into_ssl()
@@ -19,38 +20,35 @@ SITE_DIR = ".site"
 DATA_DIR = os.path.join(SITE_DIR, "data")
 SERPER_URL = "https://google.serper.dev/search"
 BATCH_SIZE = 100
+PARALLEL_BATCHES = 4
 
 
-def build_query(name: str, city: str, foodie_sites: list[str]) -> str:
-    sites = " OR ".join(foodie_sites)
-    return f'"{name}" restaurant {city} site:({sites})'
+def matches_foodie_site(url: str, foodie_sites: list[str]) -> bool:
+    """Check if a URL belongs to one of the allowed foodie sites."""
+    try:
+        parsed = urlparse(url)
+        host = parsed.hostname or ""
+        path = parsed.path or ""
+        for site in foodie_sites:
+            # site can be "ny.eater.com" or "www.theinfatuation.com/new-york"
+            if "/" in site:
+                domain, prefix = site.split("/", 1)
+                if host.endswith(domain) and path.startswith("/" + prefix):
+                    return True
+            elif host.endswith(site):
+                return True
+    except Exception:
+        pass
+    return False
 
 
-def search_batch(queries: list[dict], api_key: str, max_retries: int = 3) -> list[dict]:
-    """Send a batch of queries to Serper and return results."""
-    headers = {
-        "X-API-KEY": api_key,
-        "Content-Type": "application/json",
-    }
-    for attempt in range(max_retries):
-        try:
-            resp = requests.post(SERPER_URL, json=queries, headers=headers, timeout=60)
-            resp.raise_for_status()
-            results = resp.json()
-            # Single query returns a dict, batch returns a list
-            return results if isinstance(results, list) else [results]
-        except Exception as e:
-            if attempt < max_retries - 1:
-                wait = 2 ** attempt
-                print(f"  retry {attempt + 1}/{max_retries} in {wait}s: {e}")
-                time.sleep(wait)
-                continue
-            raise
-
-
-def extract_urls(result: dict) -> list[str]:
-    """Extract URLs from a Serper search result."""
-    return [item["link"] for item in result.get("organic", []) if item.get("link")]
+def search_batch(queries: list[dict], api_key: str) -> list[dict]:
+    """Send a batch of up to 100 queries to Serper, return list of results."""
+    resp = requests.post(SERPER_URL, json=queries, timeout=60,
+                         headers={"X-API-KEY": api_key, "Content-Type": "application/json"})
+    resp.raise_for_status()
+    results = resp.json()
+    return results if isinstance(results, list) else [results]
 
 
 def main(quick: bool = False):
@@ -83,6 +81,7 @@ def main(quick: bool = False):
             restaurants = json.load(f)
 
         # Collect restaurants needing search
+        sites_query = " OR ".join(foodie_sites)
         to_search = []
         for i, r in enumerate(restaurants):
             if "foodie_urls" in r:
@@ -91,34 +90,43 @@ def main(quick: bool = False):
             if not name:
                 r["foodie_urls"] = []
                 continue
-            to_search.append((i, name))
+            to_search.append((i, {"q": f'"{name}" restaurant {city["name"]} site:({sites_query})', "num": 5}))
 
-        skipped = sum(1 for r in restaurants if "foodie_urls" in r)
-        total = len(restaurants)
-        print(f"\n{city['name']} ({total} restaurants, {len(to_search)} to search, {skipped} already done)...", flush=True)
+        skipped = len(restaurants) - len(to_search) - sum(1 for r in restaurants if "foodie_urls" not in r and not (r.get("name") or "").strip())
+        print(f"\n{city['name']}: {len(restaurants)} total, {len(to_search)} to search, {skipped} already done", flush=True)
+
+        # Submit batches in parallel
+        batches = []
+        for start in range(0, len(to_search), BATCH_SIZE):
+            chunk = to_search[start:start + BATCH_SIZE]
+            batches.append(([idx for idx, _ in chunk], [q for _, q in chunk]))
 
         searched = 0
-        for batch_start in range(0, len(to_search), BATCH_SIZE):
-            batch = to_search[batch_start:batch_start + BATCH_SIZE]
-            queries = [{"q": build_query(name, city["name"], foodie_sites), "num": 5} for _, name in batch]
+        with ThreadPoolExecutor(max_workers=PARALLEL_BATCHES) as pool:
+            futures = {pool.submit(search_batch, queries, api_key): idxs for idxs, queries in batches}
+            for future in as_completed(futures):
+                idxs = futures[future]
+                try:
+                    results = future.result()
+                    for idx, result in zip(idxs, results):
+                        urls = [r["link"] for r in result.get("organic", []) if r.get("link")]
+                        restaurants[idx]["foodie_urls"] = [u for u in urls if matches_foodie_site(u, foodie_sites)]
+                except Exception as e:
+                    print(f"  FAILED batch: {e}")
+                    for idx in idxs:
+                        restaurants[idx]["foodie_urls"] = None
 
-            try:
-                results = search_batch(queries, api_key)
-                for (idx, _), result in zip(batch, results):
-                    restaurants[idx]["foodie_urls"] = extract_urls(result)
-            except Exception as e:
-                print(f"  FAILED batch at {batch_start}: {e}")
-                for idx, _ in batch:
-                    restaurants[idx]["foodie_urls"] = None
+                searched += len(idxs)
+                with open(data_path, "w") as f:
+                    json.dump(restaurants, f)
+                found = sum(1 for r in restaurants if r.get("foodie_urls"))
+                print(f"  {searched}/{len(to_search)} searched, {found} with URLs", flush=True)
 
-            searched += len(batch)
-            with open(data_path, "w") as f:
-                json.dump(restaurants, f)
-            found_so_far = sum(1 for r in restaurants if r.get("foodie_urls"))
-            print(f"  ... {searched}/{len(to_search)} searched, {found_so_far} with URLs", flush=True)
-
-        found = sum(1 for r in restaurants if r.get("foodie_urls"))
-        print(f"  {searched} searched, {skipped} skipped, {found} with foodie URLs")
+        # Filter to only restaurants with foodie URLs
+        restaurants = [r for r in restaurants if r.get("foodie_urls")]
+        with open(data_path, "w") as f:
+            json.dump(restaurants, f)
+        print(f"  Done: {len(restaurants)} restaurants with foodie URLs written")
 
     print("\nDone.")
 

@@ -7,7 +7,7 @@
     "lng": -73.9855,
     "zoom": 14,
     "bbox": { "south": 40.700, "west": -74.020, "north": 40.820, "east": -73.930 },
-    "foodie_sites": ["ny.eater.com", "www.theinfatuation.com/new-york", "ny.itsfound.com", "guide.michelin.com/us/en/restaurants"]
+    "foodie_sites": ["ny.itsfound.com", "guide.michelin.com/us/en/new-york-state/new-york/restaurants"]
   },
   {
     "key": "miami",
@@ -17,7 +17,7 @@
     "lng": -80.1918,
     "zoom": 14,
     "bbox": { "south": 25.750, "west": -80.220, "north": 25.810, "east": -80.120 },
-    "foodie_sites": ["miami.eater.com", "www.theinfatuation.com/miami", "miami.itsfound.com", "guide.michelin.com/us/en/restaurants"]
+    "foodie_sites": ["miami.itsfound.com", "guide.michelin.com/us/en/florida/miami/restaurants"]
   },
   {
     "key": "sf",
@@ -27,7 +27,7 @@
     "lng": -122.4194,
     "zoom": 14,
     "bbox": { "south": 37.730, "west": -122.450, "north": 37.810, "east": -122.380 },
-    "foodie_sites": ["sf.eater.com", "www.theinfatuation.com/san-francisco", "sf.itsfound.com", "guide.michelin.com/us/en/restaurants"]
+    "foodie_sites": ["sf.itsfound.com", "guide.michelin.com/us/en/california/san-francisco/restaurants"]
   },
   {
     "key": "la",
@@ -37,7 +37,7 @@
     "lng": -118.2437,
     "zoom": 13,
     "bbox": { "south": 34.010, "west": -118.350, "north": 34.110, "east": -118.220 },
-    "foodie_sites": ["la.eater.com", "www.theinfatuation.com/los-angeles", "la.itsfound.com", "guide.michelin.com/us/en/restaurants"]
+    "foodie_sites": ["la.itsfound.com", "guide.michelin.com/us/en/california/los-angeles/restaurants"]
   },
   {
     "key": "austin",
@@ -47,6 +47,6 @@
     "lng": -97.7431,
     "zoom": 14,
     "bbox": { "south": 30.230, "west": -97.790, "north": 30.310, "east": -97.700 },
-    "foodie_sites": ["austin.eater.com", "www.theinfatuation.com/austin", "austin.itsfound.com", "guide.michelin.com/us/en/restaurants"]
+    "foodie_sites": ["austin.itsfound.com", "guide.michelin.com/us/en/texas/austin/restaurants"]
   }
 ]
