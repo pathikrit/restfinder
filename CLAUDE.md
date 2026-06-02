@@ -75,7 +75,7 @@ make db                                # full: all cities, all restaurants (~15m
 - **Raw data**: `fetch.py` stores data as close to the API response as possible. All formatting (address assembly, cuisine semicolons→commas, etc.) happens in `index.html` JavaScript.
 - **Incremental foodie**: `fetch.py foodie` skips restaurants that already have a `foodie_urls` key, so re-runs only process new restaurants.
 - **SSL**: `truststore` is used to handle corporate proxy SSL interception.
-- **Google CSE**: Create a Programmable Search Engine at https://programmablesearchengine.google.com/ with foodie sites configured there. Free tier: 100 queries/day; paid: $5 per 1000 queries.
+- **Google CSE**: Create a Programmable Search Engine at https://programmablesearchengine.google.com/ with foodie sites added and "Search only included sites" enabled (not "Search the entire web"). Free tier: 100 queries/day; paid: $5 per 1000 queries.
 - **No framework**: single HTML file with inline CSS/JS, Leaflet via CDN. No build tools, no npm.
 
 ## Frontend architecture (index.html)
