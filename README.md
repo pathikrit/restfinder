@@ -3,6 +3,7 @@
 ## Run
 
 ```
-make db      # fetch restaurants + foodie URLs
-make dev     # serve on http://localhost:8080
+cp .env.sample .env     # fill in your API key
+make db                 # fetch restaurants + foodie URLs
+make dev                # serve on http://localhost:8080
 ```

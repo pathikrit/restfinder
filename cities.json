@@ -2,6 +2,7 @@
   {
     "key": "nyc",
     "name": "NYC",
+    "enabled": true,
     "lat": 40.7580,
     "lng": -73.9855,
     "zoom": 14,
@@ -11,6 +12,7 @@
   {
     "key": "miami",
     "name": "Miami",
+    "enabled": false,
     "lat": 25.7617,
     "lng": -80.1918,
     "zoom": 14,
@@ -20,6 +22,7 @@
   {
     "key": "sf",
     "name": "SF",
+    "enabled": false,
     "lat": 37.7749,
     "lng": -122.4194,
     "zoom": 14,
@@ -29,6 +32,7 @@
   {
     "key": "la",
     "name": "LA",
+    "enabled": false,
     "lat": 34.0522,
     "lng": -118.2437,
     "zoom": 13,
@@ -38,6 +42,7 @@
   {
     "key": "austin",
     "name": "Austin",
+    "enabled": false,
     "lat": 30.2672,
     "lng": -97.7431,
     "zoom": 14,

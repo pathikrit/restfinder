@@ -63,7 +63,7 @@ def fetch_city(city: dict, max_retries: int = 5) -> list[dict]:
 
 def main(quick: bool = False):
     with open("cities.json") as f:
-        cities = json.load(f)
+        cities = [c for c in json.load(f) if c.get("enabled", True)]
 
     if quick:
         cities = cities[:2]
@@ -150,7 +150,7 @@ def foodie_main(quick: bool = False):
     exa = Exa(api_key=api_key)
 
     with open("cities.json") as f:
-        cities = json.load(f)
+        cities = [c for c in json.load(f) if c.get("enabled", True)]
 
     if quick:
         cities = cities[:2]

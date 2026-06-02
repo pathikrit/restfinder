@@ -226,7 +226,7 @@
 
         // --- Load cities.json and bootstrap ---
         fetch('cities.json').then(r => r.json()).then(data => {
-            cities = data;
+            cities = data.filter(c => c.enabled !== false);
             const lastUpdated = document.getElementById('last-updated');
             cities.forEach(city => {
                 const btn = document.createElement('button');
