@@ -122,8 +122,19 @@ def main(quick: bool = False):
                 found = sum(1 for r in restaurants if r.get("foodie_urls"))
                 print(f"  {searched}/{len(to_search)} searched, {found} with URLs", flush=True)
 
-        # Filter to only restaurants with foodie URLs
-        restaurants = [r for r in restaurants if r.get("foodie_urls")]
+        # Filter to restaurants with >=2 distinct foodie domains
+        def distinct_domains(urls):
+            domains = set()
+            for u in (urls or []):
+                try:
+                    host = urlparse(u).hostname.replace("archive.", "www.")
+                    if host:
+                        domains.add(host)
+                except Exception:
+                    pass
+            return domains
+
+        restaurants = [r for r in restaurants if len(distinct_domains(r.get("foodie_urls"))) >= 2]
         with open(data_path, "w") as f:
             json.dump(restaurants, f)
         print(f"  Done: {len(restaurants)} restaurants with foodie URLs written")
