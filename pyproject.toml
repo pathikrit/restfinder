@@ -6,4 +6,5 @@ dependencies = [
     "requests==2.34.2",
     "truststore==0.10.4",
     "python-dotenv==1.2.2",
+    "tld==0.13",
 ]

@@ -76,6 +76,7 @@ source = { virtual = "." }
 dependencies = [
     { name = "python-dotenv" },
     { name = "requests" },
+    { name = "tld" },
     { name = "truststore" },
 ]
 
@@ -83,7 +84,17 @@ dependencies = [
 requires-dist = [
     { name = "python-dotenv", specifier = "==1.2.2" },
     { name = "requests", specifier = "==2.34.2" },
+    { name = "tld", specifier = "==0.13" },
     { name = "truststore", specifier = "==0.10.4" },
+]
+
+[[package]]
+name = "tld"
+version = "0.13"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/19/2b/678082222bc1d2823ea8384c6806085b85226ff73885c703fe0c7143ef64/tld-0.13.tar.gz", hash = "sha256:93dde5e1c04bdf1844976eae440706379d21f4ab235b73c05d7483e074fb5629", size = 446824, upload-time = "2023-02-27T21:06:48.888Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ea/75/779ddeaf4d847ba0021ad99d1b615a853f2a5762bd5d118273c7f7673c38/tld-0.13-py2.py3-none-any.whl", hash = "sha256:f75b2be080f767ed17c2338a339eaa4fab5792586319ca819119da252f9f3749", size = 263789, upload-time = "2023-02-27T21:06:46.27Z" },
 ]
 
 [[package]]

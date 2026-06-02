@@ -7,7 +7,7 @@
     "lng": -73.9855,
     "zoom": 14,
     "bbox": { "south": 40.700, "west": -74.020, "north": 40.820, "east": -73.930 },
-    "foodie_sites": ["ny.itsfound.com", "guide.michelin.com/us/en/new-york-state/new-york/restaurants", "jamesbeard.org", "atlasobscura.com/places", "www.theinfatuation.com/new-york/reviews"]
+    "foodie_sites": ["ny.itsfound.com", "guide.michelin.com/us/en/new-york-state/new-york/restaurants", "jamesbeard.org", "atlasobscura.com/places", "www.theinfatuation.com/new-york/reviews", "blog.resy.com", "andyhayler.com", "travelsforstars.com", "forbes.com", "nymag.com", "eatingreallywell.com"]
   },
   {
     "key": "miami",

@@ -5,7 +5,9 @@ import json
 import os
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from urllib.parse import urlparse
+from functools import cache
+
+from tld import get_fld
 
 import truststore
 truststore.inject_into_ssl()
@@ -23,17 +25,26 @@ BATCH_SIZE = 100
 PARALLEL_BATCHES = 4
 
 
+@cache
+def domain(url: str) -> str | None:
+    """Extract registered domain (domain+tld) from a URL."""
+    try:
+        return get_fld(url, fail_silently=True)
+    except Exception:
+        return None
+
+
 def matches_foodie_site(url: str, foodie_sites: list[str]) -> bool:
     """Check if a URL belongs to one of the allowed foodie sites."""
     try:
+        from urllib.parse import urlparse
         parsed = urlparse(url)
         host = parsed.hostname or ""
         path = parsed.path or ""
         for site in foodie_sites:
-            # site can be "ny.eater.com" or "www.theinfatuation.com/new-york"
             if "/" in site:
-                domain, prefix = site.split("/", 1)
-                if host.endswith(domain) and path.startswith("/" + prefix):
+                domain_part, prefix = site.split("/", 1)
+                if host.endswith(domain_part) and path.startswith("/" + prefix):
                     return True
             elif host.endswith(site):
                 return True
@@ -124,15 +135,7 @@ def main(quick: bool = False):
 
         # Filter to restaurants with >=2 distinct foodie domains
         def distinct_domains(urls):
-            domains = set()
-            for u in (urls or []):
-                try:
-                    host = urlparse(u).hostname.replace("archive.", "www.")
-                    if host:
-                        domains.add(host)
-                except Exception:
-                    pass
-            return domains
+            return {d for u in (urls or []) if (d := domain(u))}
 
         restaurants = [r for r in restaurants if len(distinct_domains(r.get("foodie_urls"))) >= 2]
         with open(data_path, "w") as f:

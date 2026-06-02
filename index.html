@@ -201,7 +201,7 @@
         function distinctDomains(urls) {
             if (!urls || !urls.length) return new Set();
             const domains = new Set();
-            urls.forEach(u => { try { domains.add(new URL(u).hostname.replace('archive.', 'www.')); } catch {} });
+            urls.forEach(u => { try { const h = new URL(u).hostname.split('.'); domains.add(h.slice(-2).join('.')); } catch {} });
             return domains;
         }
 
