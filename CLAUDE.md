@@ -2,19 +2,19 @@
 
 ## What is this
 
-RestFinder — a static restaurant finder app. Shows restaurants on a map with data from OpenStreetMap, augmented with mentions from foodie review sites via Exa.ai. Deployed to GitHub Pages at pathikrit.github.io/restfinder.
+RestFinder — a static restaurant finder app. Shows restaurants on a map with data from city open-data APIs (NYC DOHMH via Socrata), augmented with mentions from foodie review sites via Serper.dev (Google Search). Deployed to GitHub Pages at pathikrit.github.io/restfinder.
 
 ## File layout
 
 ```
-cities.json       — city definitions: center, zoom, bbox (for Overpass), foodie_sites (for Exa)
-fetch.py          — two modes:
-                      `uv run fetch.py`        → fetch restaurants from Overpass API
-                      `uv run fetch.py foodie`  → augment with foodie URLs from Exa.ai
+cities.json       — city definitions: center, zoom, bbox, foodie_sites, enabled flag
+fetcher.py        — fetch restaurant data from city APIs (NYC uses Socrata DOHMH)
+foodie.py         — augment with foodie URLs from Serper.dev (batched Google Search)
 index.html        — the entire frontend (inline CSS + JS), no build step
 Makefile          — make db-copy / make db-smoketest / make db / make site / make dev / make clean
 pyproject.toml    — uv project, all deps pinned ==x.y.z, Python pinned ===x.y.z
-.env              — EXA_API_KEY (gitignored)
+.env.sample       — template for .env (checked in)
+.env              — SERPER_API_KEY (gitignored)
 .site/            — build output dir (gitignored), served by make dev / GitHub Pages
 .site/data/*.json — pre-fetched restaurant data per city
 .github/workflows/deploy.yml — manual fetch + deploy to GitHub Pages
@@ -27,26 +27,26 @@ make db-copy                           # download pre-built data from GitHub Pag
 make dev                               # serve on :8080 with file watching
 ```
 
-To rebuild data from scratch (requires Exa API key):
+To rebuild data from scratch (requires Serper API key for foodie step):
 ```bash
-echo "EXA_API_KEY=your-key" > .env    # one-time setup
-make db-smoketest                      # quick: 2 cities, 100 restaurants each
-make db                                # full: all cities, all restaurants (~15min)
+cp .env.sample .env                    # one-time setup, then fill in key
+make db-smoketest                      # quick: 100 restaurants, with foodie lookup
+make db                                # full: all enabled cities, all restaurants
 ```
 
 ## Makefile targets
 
 - `make db-copy` — downloads pre-built restaurant data from GitHub Pages. No API keys needed — fastest way to get started.
-- `make db-smoketest` — fetches first 2 cities, 100 restaurants each, with foodie lookup. Quick local dev sanity check.
-- `make db` — full Overpass fetch + Exa foodie lookup for all cities. Fails if `.env` missing `EXA_API_KEY`.
+- `make db-smoketest` — fetches 100 restaurants with foodie lookup. Quick local dev sanity check.
+- `make db` — full fetch + Serper foodie lookup for all enabled cities. Fails if `.env` missing `SERPER_API_KEY`.
 - `make site` — copies `cities.json` + `index.html` into `.site/`. Used by GitHub Actions.
 - `make dev` — depends on `site`. Watches `index.html`/`cities.json` for changes (via `fswatch`) and auto-copies. Serves `.site/` on port 8080.
 - `make clean` — removes `.site/`.
 
 ## Data flow
 
-1. `fetch.py` queries Overpass API with each city's `bbox` → raw restaurant data with full OSM `tags`
-2. `fetch.py foodie` reads the saved JSON, queries Exa.ai for each named restaurant against the city's `foodie_sites`, adds `foodie_urls` to each restaurant object
+1. `fetcher.py` queries city open-data APIs (NYC: Socrata DOHMH, GROUP BY camis) → deduplicated restaurant data
+2. `foodie.py` reads the saved JSON, queries Serper.dev in batches of 100 for each named restaurant against the city's `foodie_sites`, adds `foodie_urls`
 3. `make site` copies static assets into `.site/`
 4. `index.html` loads `cities.json` (for tabs) and `data/{key}.json` (for restaurants) — zero API calls at runtime
 
@@ -55,46 +55,47 @@ make db                                # full: all cities, all restaurants (~15m
 ```json
 [
   {
-    "id": 123456,
-    "lat": 40.76,
-    "lon": -73.98,
-    "tags": { "name": "...", "cuisine": "...", "addr:street": "...", ... },
+    "id": "50076500",
+    "name": "Atomix",
+    "cuisine": "Korean",
+    "address": "104 East 30 Street, Manhattan, 10016",
+    "lat": 40.7444,
+    "lon": -73.9827,
+    "phone": "6466968901",
     "foodie_urls": ["https://ny.eater.com/..."]
   }
 ]
 ```
 
-- `tags` is raw from Overpass (OSM tags, unmodified)
-- `foodie_urls` is at the top level (not inside `tags`), added by the foodie step
 - `foodie_urls` key absent = not yet checked. `[]` = checked, no results. `null` = error, retry next run.
 
 ## Key conventions
 
 - **Pinned versions**: **zero tolerance for unpinned versions.** All Python deps use `==x.y.z`, Python itself uses `===x.y.z` in `requires-python`, and JS CDN libs are pinned to exact versions in the URL. No `>=`, `^`, `~`, `latest`, or unversioned references anywhere.
-- **Raw data**: `fetch.py` stores data as close to the API response as possible. All formatting (address assembly, cuisine semicolons→commas, etc.) happens in `index.html` JavaScript.
-- **Incremental foodie**: `fetch.py foodie` skips restaurants that already have a `foodie_urls` key, so re-runs only process new restaurants.
+- **Incremental foodie**: `foodie.py` skips restaurants that already have a `foodie_urls` key, so re-runs only process new restaurants.
 - **SSL**: `truststore` is used to handle corporate proxy SSL interception.
+- **Serper.dev**: Batched Google Search API — up to 100 queries per request. Uses `site:` operator to restrict to foodie sites.
 - **No framework**: single HTML file with inline CSS/JS, Leaflet via CDN. No build tools, no npm.
 
 ## Frontend architecture (index.html)
 
-- City tabs dynamically built from `cities.json`
+- City tabs dynamically built from `cities.json`; disabled cities show as greyed-out "Coming soon"
 - On city select: loads `data/{key}.json`, caches in memory
 - On pan/zoom (`moveend`): filters cached data to visible map bounds, re-renders markers + table
-- `t(r, key)` helper reads from `r.tags[key]` (raw format) or `r[key]` (legacy flat format)
-- "Foodie" pill toggle: when active, filters to `r.foodie_urls.length > 0`
+- Foodie site checkboxes: when active, filters to restaurants with matching `foodie_urls`
 - `<meta name="last-updated">` populated by GitHub Actions at build time via `sed`
 
 ## GitHub Actions
 
-- Runs on manual dispatch only
-- `EXA_API_KEY` passed via env (from workflow input or repo secret)
+- Runs on push (UI-only deploy via `db-copy`) and manual dispatch (full data rebuild)
+- `SERPER_API_KEY` passed via env (from repo secret) for manual dispatch
 - Runs `make db` → `make site`
 - Injects last-updated date into `index.html`
 - Deploys `.site/` to GitHub Pages
 
 ## Adding a new city
 
-1. Add entry to `cities.json` with `key`, `name`, `lat`, `lng`, `zoom`, `bbox`, `foodie_sites`
-2. Run `make db` — it fetches restaurants and foodie URLs for all cities
-3. The frontend picks it up automatically (tabs built from `cities.json`)
+1. Add entry to `cities.json` with `key`, `name`, `enabled`, `lat`, `lng`, `zoom`, `bbox`, `foodie_sites`
+2. Implement a fetcher function in `fetcher.py` for the city's data source
+3. Run `make db` — it fetches restaurants and foodie URLs for all enabled cities
+4. The frontend picks it up automatically (tabs built from `cities.json`)

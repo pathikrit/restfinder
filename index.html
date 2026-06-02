@@ -31,6 +31,8 @@
         }
         #city-tabs button:hover { color: #cbd5e1; }
         #city-tabs button.active { color: #f1f5f9; border-bottom-color: #3b82f6; }
+        #city-tabs button:disabled { color: #334155; cursor: not-allowed; }
+        #city-tabs button:disabled:hover { color: #334155; }
 
         #github-link {
             display: flex;
@@ -43,26 +45,6 @@
         }
         #github-link:hover { color: #f1f5f9; }
 
-        .foodie-checks {
-            display: flex;
-            gap: 8px;
-            margin-top: 4px;
-            justify-content: center;
-            flex-wrap: wrap;
-        }
-        .foodie-checks label {
-            display: inline-flex;
-            align-items: center;
-            gap: 3px;
-            cursor: pointer;
-            font-size: 11px;
-            font-weight: 600;
-            color: #64748b;
-        }
-        .foodie-checks label.active { color: #fbbf24; }
-        .foodie-checks input[type="checkbox"] {
-            accent-color: #f59e0b;
-        }
         #last-updated {
             margin-left: auto;
             display: flex;
@@ -143,6 +125,7 @@
         }
         .col-filter .clear-btn:hover { color: #e2e8f0; }
         .col-filter input:not(:placeholder-shown) + .clear-btn { display: block; }
+        .red-marker { filter: hue-rotate(150deg) saturate(2); }
         .pin-label {
             font-size: 12px;
             font-weight: 600;
@@ -199,17 +182,40 @@
         const tableWrap = document.getElementById('table-wrap');
         const tabsNav = document.getElementById('city-tabs');
 
+        const defaultIcon = L.icon({
+            iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+            iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
+        });
+        const redIcon = L.icon({
+            iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+            iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41],
+            className: 'red-marker'
+        });
+        const whimsyIcon = L.divIcon({
+            html: '<span style="font-size:28px">&#x1F47B;</span>',
+            className: '', iconSize: [28, 28], iconAnchor: [14, 28], popupAnchor: [0, -28]
+        });
+
+        function distinctDomains(urls) {
+            if (!urls || !urls.length) return new Set();
+            const domains = new Set();
+            urls.forEach(u => { try { domains.add(new URL(u).hostname.replace('archive.', 'www.')); } catch {} });
+            return domains;
+        }
+
+        function pickIcon(r) {
+            const domains = distinctDomains(r.foodie_urls);
+            if (domains.has('www.atlasobscura.com')) return whimsyIcon;
+            if (domains.size >= 2) return redIcon;
+            return defaultIcon;
+        }
+
         let cities = [];
         let activeCity = null;
         let cityData = {};
         let markers = {};
-        const foodieSites = [
-            { key: 'eater', label: 'Eater', match: 'eater.com' },
-            { key: 'infatuation', label: 'Infatuation', match: 'theinfatuation.com' },
-            { key: 'found', label: 'Found', match: 'itsfound.com' },
-            { key: 'michelin', label: 'Michelin', match: 'guide.michelin.com' },
-        ];
-        let foodieChecked = {};
         let colFilters = { name: '', cuisine: '', address: '' };
 
         // --- Last updated ---
@@ -225,14 +231,19 @@
         }
 
         // --- Load cities.json and bootstrap ---
-        fetch('cities.json').then(r => r.json()).then(data => {
-            cities = data;
+        fetch('cities.json').then(r => r.json()).then(allCities => {
+            cities = allCities.filter(c => c.enabled !== false);
             const lastUpdated = document.getElementById('last-updated');
-            cities.forEach(city => {
+            allCities.forEach(city => {
                 const btn = document.createElement('button');
                 btn.textContent = city.name;
                 btn.dataset.key = city.key;
-                btn.addEventListener('click', () => selectCity(city.key));
+                if (city.enabled !== false) {
+                    btn.addEventListener('click', () => selectCity(city.key));
+                } else {
+                    btn.disabled = true;
+                    btn.title = 'Coming soon';
+                }
                 tabsNav.insertBefore(btn, lastUpdated);
             });
             const ghLink = document.createElement('a');
@@ -262,53 +273,11 @@
             }
         }
 
-        const lowValueUrl = url => {
-            try {
-                const u = new URL(url);
-                const p = u.pathname;
-                if (u.hostname === 'www.theinfatuation.com' && /\/reviews\//.test(p)) return true;
-                if (u.hostname === 'www.theinfatuation.com' && /\/cuisines\//.test(p)) return true;
-                if (u.hostname.endsWith('eater.com') && /\/venue\//.test(p)) return true;
-                if (u.hostname.endsWith('eater.com') && /open/i.test(p)) return true;
-                if (u.hostname.endsWith('eater.com') && p === '/') return true;
-                if (u.hostname.endsWith('itsfound.com') && !/\/p\//.test(p)) return true;
-            } catch { return false; }
-            return false;
-        };
-
         async function loadCityData(key) {
             if (cityData[key]) return;
             const resp = await fetch(`data/${key}.json`);
             if (!resp.ok) throw new Error(`Failed to load data/${key}.json`);
-            const data = await resp.json();
-            data.forEach(r => {
-                if (r.foodie_urls) r.foodie_urls = r.foodie_urls.filter(u => !lowValueUrl(u));
-            });
-            cityData[key] = data;
-        }
-
-        // --- Extract fields from raw tags (or legacy flat format) ---
-        function t(r, key) {
-            if (r.tags) return r.tags[key] || '';
-            return r[key] || '';
-        }
-
-        function formatAddress(r) {
-            const tags = r.tags || {};
-            if (r.tags) {
-                return [tags['addr:housenumber'], tags['addr:street'], tags['addr:city'], tags['addr:state'], tags['addr:postcode']]
-                    .filter(Boolean).join(' ');
-            }
-            return r.address || '';
-        }
-
-        function formatCuisine(r) {
-            return t(r, 'cuisine').replace(/;/g, ', ').replace(/_/g, ' ')
-                .replace(/\b\w/g, c => c.toUpperCase());
-        }
-
-        function formatHours(r) {
-            return r.tags ? t(r, 'opening_hours') : t(r, 'hours');
+            cityData[key] = await resp.json();
         }
 
         function formatFoodieLinks(urls) {
@@ -330,89 +299,66 @@
                 r.lon >= bounds.getWest() && r.lon <= bounds.getEast()
             );
 
-            const activeSites = foodieSites.filter(s => foodieChecked[s.key]);
-            if (activeSites.length) {
-                visible = visible.filter(r => r.foodie_urls && r.foodie_urls.some(u =>
-                    activeSites.some(s => u.includes(s.match))
-                ));
-            }
-
             if (colFilters.name) {
                 const q = colFilters.name.toLowerCase();
-                visible = visible.filter(r => (t(r, 'name') || '').toLowerCase().includes(q));
+                visible = visible.filter(r => (r.name || '').toLowerCase().includes(q));
             }
             if (colFilters.cuisine) {
                 const q = colFilters.cuisine.toLowerCase();
-                visible = visible.filter(r => formatCuisine(r).toLowerCase().includes(q));
+                visible = visible.filter(r => (r.cuisine || '').toLowerCase().includes(q));
             }
             if (colFilters.address) {
                 const q = colFilters.address.toLowerCase();
-                visible = visible.filter(r => formatAddress(r).toLowerCase().includes(q));
+                visible = visible.filter(r => (r.address || '').toLowerCase().includes(q));
             }
 
             markerLayer.clearLayers();
             markers = {};
             visible.forEach(r => {
-                const name = t(r, 'name') || 'Unnamed';
-                const cuisine = formatCuisine(r);
-                const address = formatAddress(r);
-                const phone = t(r, 'phone');
-                const website = t(r, 'website');
+                const name = r.name || 'Unnamed';
+                const cuisine = r.cuisine || '';
+                const address = r.address || '';
+                const phone = r.phone || '';
 
                 let popup = `<strong>${esc(name)}</strong>`;
                 if (cuisine) popup += `<br>${esc(cuisine)}`;
                 if (address) popup += `<br><i class="fa-solid fa-location-dot"></i> <address style="font-style:normal;display:inline">${esc(address)}</address>`;
                 if (phone) popup += `<br><i class="fa-solid fa-phone"></i> <a href="tel:${esc(phone)}">${esc(phone)}</a>`;
-                if (website) popup += `<br><a href="${esc(website)}" target="_blank" rel="noopener">Website</a>`;
                 if (r.foodie_urls && r.foodie_urls.length) {
                     popup += `<br><strong style="color:#f59e0b">Mentions:</strong> ${formatFoodieLinks(r.foodie_urls)}`;
                 }
-                const m = L.marker([r.lat, r.lon]).bindPopup(popup);
+                const m = L.marker([r.lat, r.lon], { icon: pickIcon(r) }).bindPopup(popup);
                 if (visible.length <= 10) m.bindTooltip(name, { permanent: true, direction: 'top', className: 'pin-label' });
                 m.addTo(markerLayer);
                 markers[r.id] = m;
             });
 
-            const foodieChecksHtml = `<div class="foodie-checks">${foodieSites.map(s =>
-                `<label class="${foodieChecked[s.key] ? 'active' : ''}"><input type="checkbox" data-site="${s.key}" ${foodieChecked[s.key] ? 'checked' : ''}>${s.label}</label>`
-            ).join('')}</div>`;
             const filterInput = (key) => `<div class="col-filter"><input type="text" data-filter="${key}" placeholder="Filter..." value="${esc(colFilters[key])}"><button class="clear-btn" data-clear="${key}">&times;</button></div>`;
             let html = `<table><thead><tr>
                 <th>#</th><th>Name${filterInput('name')}</th><th>Cuisine${filterInput('cuisine')}</th><th>Address${filterInput('address')}</th>
-                <th>Phone</th><th>Hours</th><th>Mentions${foodieChecksHtml}</th>
+                <th>Phone</th><th>Mentions</th>
                 </tr></thead><tbody>`;
             visible.forEach((r, i) => {
-                const name = t(r, 'name') || 'Unnamed';
-                const cuisine = formatCuisine(r);
-                const address = formatAddress(r);
-                const phone = t(r, 'phone');
-                const website = t(r, 'website');
-                const hours = formatHours(r);
+                const name = r.name || 'Unnamed';
+                const cuisine = r.cuisine || '';
+                const address = r.address || '';
+                const phone = r.phone || '';
                 const foodie = formatFoodieLinks(r.foodie_urls);
-                const nameHtml = website ? `<a href="${esc(website)}" target="_blank" rel="noopener">${esc(name)}</a>` : esc(name);
                 html += `<tr class="data-row" data-id="${r.id}" data-lat="${r.lat}" data-lon="${r.lon}">
                     <td>${i + 1}</td>
-                    <td title="${esc(name)}">${nameHtml}</td>
+                    <td title="${esc(name)}">${esc(name)}</td>
                     <td title="${esc(cuisine)}">${esc(cuisine)}</td>
                     <td title="${esc(address)}"><address style="font-style:normal">${esc(address)}</address></td>
                     <td>${phone ? `<a href="tel:${esc(phone)}">${esc(phone)}</a>` : ''}</td>
-                    <td title="${esc(hours)}">${esc(hours)}</td>
                     <td>${foodie}</td></tr>`;
             });
             if (visible.length === 0) {
-                html += `<tr><td colspan="7" style="text-align:center;color:#475569;padding:20px">No matching restaurants.</td></tr>`;
+                html += `<tr><td colspan="6" style="text-align:center;color:#475569;padding:20px">No matching restaurants.</td></tr>`;
             }
             html += '</tbody></table>';
             const activeFilter = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.filter;
             tableWrap.innerHTML = html;
 
-            tableWrap.querySelectorAll('.foodie-checks input').forEach(cb => {
-                cb.addEventListener('change', e => {
-                    foodieChecked[e.target.dataset.site] = e.target.checked;
-                    updateView();
-                });
-                cb.addEventListener('click', e => e.stopPropagation());
-            });
             tableWrap.querySelectorAll('.col-filter input').forEach(input => {
                 input.addEventListener('input', e => {
                     colFilters[e.target.dataset.filter] = e.target.value;
@@ -438,7 +384,7 @@
                     row.classList.add('selected');
                     const lat = parseFloat(row.dataset.lat);
                     const lon = parseFloat(row.dataset.lon);
-                    const id = parseInt(row.dataset.id);
+                    const id = row.dataset.id;
                     map.setView([lat, lon], 18);
                     if (markers[id]) markers[id].openPopup();
                 });

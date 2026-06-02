@@ -1,11 +1,14 @@
-.PHONY: db db-copy db-smoketest site dev clean
+.PHONY: check-keys db db-copy db-smoketest site dev clean
+
+check-keys:
+	@test -n "$$SERPER_API_KEY" || (test -f .env && grep -q SERPER_API_KEY .env) || { echo "Error: set SERPER_API_KEY in env or .env"; exit 1; }
 
 PAGES_URL := https://pathikrit.github.io/restfinder
 
 db-copy:
 	@mkdir -p .site/data
 	@unset SSL_CERT_FILE REQUESTS_CA_BUNDLE; \
-	python3 -c "import json; [print(c['key']) for c in json.load(open('cities.json'))]" | \
+	python3 -c "import json; [print(c['key']) for c in json.load(open('cities.json')) if c.get('enabled', True)]" | \
 		while read key; do \
 			echo "Downloading $$key..."; \
 			curl -sSf "$(PAGES_URL)/data/$$key.json" -o ".site/data/$$key.json"; \
@@ -13,14 +16,12 @@ db-copy:
 	@echo "Done."
 
 db-smoketest:
-	@test -n "$$EXA_API_KEY" || (test -f .env && grep -q EXA_API_KEY .env) || { echo "Error: set EXA_API_KEY in env or .env"; exit 1; }
-	uv run fetch.py --quick
-	uv run fetch.py foodie --quick
+	uv run fetcher.py --quick
+	uv run foodie.py --quick
 
-db:
-	@test -n "$$EXA_API_KEY" || (test -f .env && grep -q EXA_API_KEY .env) || { echo "Error: set EXA_API_KEY in env or .env"; exit 1; }
-	uv run fetch.py
-	uv run fetch.py foodie
+db: check-keys
+	uv run fetcher.py
+	uv run foodie.py
 
 site:
 	mkdir -p .site
