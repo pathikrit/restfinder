@@ -2,19 +2,19 @@
 
 ## What is this
 
-RestFinder — a static restaurant finder app. Shows restaurants on a map with data from OpenStreetMap, augmented with mentions from foodie review sites via Exa.ai. Deployed to GitHub Pages at pathikrit.github.io/restfinder.
+RestFinder — a static restaurant finder app. Shows restaurants on a map with data from OpenStreetMap, augmented with mentions from foodie review sites via Google Custom Search. Deployed to GitHub Pages at pathikrit.github.io/restfinder.
 
 ## File layout
 
 ```
-cities.json       — city definitions: center, zoom, bbox (for Overpass), foodie_sites (for Exa)
+cities.json       — city definitions: center, zoom, bbox (for Overpass), foodie_sites (for Google CSE)
 fetch.py          — two modes:
                       `uv run fetch.py`        → fetch restaurants from Overpass API
-                      `uv run fetch.py foodie`  → augment with foodie URLs from Exa.ai
+                      `uv run fetch.py foodie`  → augment with foodie URLs from Google Custom Search
 index.html        — the entire frontend (inline CSS + JS), no build step
 Makefile          — make db-copy / make db-smoketest / make db / make site / make dev / make clean
 pyproject.toml    — uv project, all deps pinned ==x.y.z, Python pinned ===x.y.z
-.env              — EXA_API_KEY (gitignored)
+.env              — GOOGLE_API_KEY + GOOGLE_CSE_ID (gitignored)
 .site/            — build output dir (gitignored), served by make dev / GitHub Pages
 .site/data/*.json — pre-fetched restaurant data per city
 .github/workflows/deploy.yml — manual fetch + deploy to GitHub Pages
@@ -27,9 +27,9 @@ make db-copy                           # download pre-built data from GitHub Pag
 make dev                               # serve on :8080 with file watching
 ```
 
-To rebuild data from scratch (requires Exa API key):
+To rebuild data from scratch (requires Google API credentials):
 ```bash
-echo "EXA_API_KEY=your-key" > .env    # one-time setup
+printf "GOOGLE_API_KEY=your-key\nGOOGLE_CSE_ID=your-cx" > .env  # one-time setup
 make db-smoketest                      # quick: 2 cities, 100 restaurants each
 make db                                # full: all cities, all restaurants (~15min)
 ```
@@ -38,7 +38,7 @@ make db                                # full: all cities, all restaurants (~15m
 
 - `make db-copy` — downloads pre-built restaurant data from GitHub Pages. No API keys needed — fastest way to get started.
 - `make db-smoketest` — fetches first 2 cities, 100 restaurants each, with foodie lookup. Quick local dev sanity check.
-- `make db` — full Overpass fetch + Exa foodie lookup for all cities. Fails if `.env` missing `EXA_API_KEY`.
+- `make db` — full Overpass fetch + Google Custom Search foodie lookup for all cities. Fails if `.env` missing `GOOGLE_API_KEY`/`GOOGLE_CSE_ID`.
 - `make site` — copies `cities.json` + `index.html` into `.site/`. Used by GitHub Actions.
 - `make dev` — depends on `site`. Watches `index.html`/`cities.json` for changes (via `fswatch`) and auto-copies. Serves `.site/` on port 8080.
 - `make clean` — removes `.site/`.
@@ -46,7 +46,7 @@ make db                                # full: all cities, all restaurants (~15m
 ## Data flow
 
 1. `fetch.py` queries Overpass API with each city's `bbox` → raw restaurant data with full OSM `tags`
-2. `fetch.py foodie` reads the saved JSON, queries Exa.ai for each named restaurant against the city's `foodie_sites`, adds `foodie_urls` to each restaurant object
+2. `fetch.py foodie` reads the saved JSON, queries Google Custom Search for each named restaurant against the city's `foodie_sites`, adds `foodie_urls` to each restaurant object
 3. `make site` copies static assets into `.site/`
 4. `index.html` loads `cities.json` (for tabs) and `data/{key}.json` (for restaurants) — zero API calls at runtime
 
@@ -74,6 +74,7 @@ make db                                # full: all cities, all restaurants (~15m
 - **Raw data**: `fetch.py` stores data as close to the API response as possible. All formatting (address assembly, cuisine semicolons→commas, etc.) happens in `index.html` JavaScript.
 - **Incremental foodie**: `fetch.py foodie` skips restaurants that already have a `foodie_urls` key, so re-runs only process new restaurants.
 - **SSL**: `truststore` is used to handle corporate proxy SSL interception.
+- **Google CSE**: Create a Programmable Search Engine at https://programmablesearchengine.google.com/ configured to search the whole web. Site restriction is done per-query via `site:` operators using each city's `foodie_sites`. Free tier: 100 queries/day; paid: $5 per 1000 queries.
 - **No framework**: single HTML file with inline CSS/JS, Leaflet via CDN. No build tools, no npm.
 
 ## Frontend architecture (index.html)
@@ -88,7 +89,7 @@ make db                                # full: all cities, all restaurants (~15m
 ## GitHub Actions
 
 - Runs on manual dispatch only
-- `EXA_API_KEY` passed via env (from workflow input or repo secret)
+- `GOOGLE_API_KEY` and `GOOGLE_CSE_ID` passed via env (from repo secrets)
 - Runs `make db` → `make site`
 - Injects last-updated date into `index.html`
 - Deploys `.site/` to GitHub Pages

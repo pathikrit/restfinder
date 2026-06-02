@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fetch restaurant data from Overpass API and foodie URLs from Exa.ai."""
+"""Fetch restaurant data from Overpass API and foodie URLs from Google Custom Search."""
 
 import json
 import os
@@ -101,32 +101,26 @@ def get_restaurant_name(r: dict) -> str:
     return r.get("name", "")
 
 
-def fetch_urls(restaurant: str, city: str, foodie_sites: list[str], exa, max_retries: int = 3) -> list[str] | None:
-    from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
+GOOGLE_CSE_URL = "https://www.googleapis.com/customsearch/v1"
 
-    def _search():
-        return exa.search(
-            query=f'"{restaurant}" {city} restaurant',
-            type="instant",
-            num_results=5,
-            include_domains=foodie_sites,
-            system_prompt="Restaurant highlights & recommendations in foodie sites; prefer atmost 1 result per site in includeDomains",
-        )
+
+def fetch_urls(restaurant: str, city: str, foodie_sites: list[str],
+               api_key: str, cse_id: str, max_retries: int = 3) -> list[str] | None:
+    site_filter = " OR ".join(f"site:{s}" for s in foodie_sites)
+    query = f'"{restaurant}" {city} restaurant ({site_filter})'
 
     for attempt in range(max_retries):
         try:
-            with ThreadPoolExecutor(max_workers=1) as pool:
-                result = pool.submit(_search).result(timeout=30)
-            return [r.url for r in result.results]
-        except FuturesTimeout:
-            if attempt < max_retries - 1:
-                wait = 2 ** attempt
-                print(f"    timeout, retry {attempt + 1}/{max_retries} in {wait}s")
-                time.sleep(wait)
-                continue
-            print(f"    FAILED after {max_retries} attempts: timeout")
-            return None
-        except Exception as e:
+            resp = requests.get(GOOGLE_CSE_URL, params={
+                "key": api_key,
+                "cx": cse_id,
+                "q": query,
+                "num": 5,
+            }, timeout=30)
+            resp.raise_for_status()
+            data = resp.json()
+            return [item["link"] for item in data.get("items", [])]
+        except requests.exceptions.RequestException as e:
             if attempt < max_retries - 1:
                 wait = 2 ** attempt
                 print(f"    retry {attempt + 1}/{max_retries} in {wait}s: {e}")
@@ -137,17 +131,15 @@ def fetch_urls(restaurant: str, city: str, foodie_sites: list[str], exa, max_ret
 
 
 def foodie_main(quick: bool = False):
-    """Augment saved restaurant data with foodie URLs from Exa.ai."""
+    """Augment saved restaurant data with foodie URLs from Google Custom Search."""
     from dotenv import load_dotenv
-    from exa_py import Exa
 
     load_dotenv()
-    api_key = os.environ.get("EXA_API_KEY")
-    if not api_key:
-        print("Error: set EXA_API_KEY in .env", file=sys.stderr)
+    api_key = os.environ.get("GOOGLE_API_KEY")
+    cse_id = os.environ.get("GOOGLE_CSE_ID")
+    if not api_key or not cse_id:
+        print("Error: set GOOGLE_API_KEY and GOOGLE_CSE_ID in .env", file=sys.stderr)
         sys.exit(1)
-
-    exa = Exa(api_key=api_key)
 
     with open("cities.json") as f:
         cities = json.load(f)
@@ -185,7 +177,7 @@ def foodie_main(quick: bool = False):
                 r["foodie_urls"] = []
                 continue
 
-            urls = fetch_urls(name, city["name"], foodie_sites, exa)
+            urls = fetch_urls(name, city["name"], foodie_sites, api_key, cse_id)
             r["foodie_urls"] = urls if urls is not None else None
             updated += 1
 

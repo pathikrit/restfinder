@@ -13,12 +13,12 @@ db-copy:
 	@echo "Done."
 
 db-smoketest:
-	@test -n "$$EXA_API_KEY" || (test -f .env && grep -q EXA_API_KEY .env) || { echo "Error: set EXA_API_KEY in env or .env"; exit 1; }
+	@test -n "$$GOOGLE_API_KEY" || (test -f .env && grep -q GOOGLE_API_KEY .env) || { echo "Error: set GOOGLE_API_KEY and GOOGLE_CSE_ID in env or .env"; exit 1; }
 	uv run fetch.py --quick
 	uv run fetch.py foodie --quick
 
 db:
-	@test -n "$$EXA_API_KEY" || (test -f .env && grep -q EXA_API_KEY .env) || { echo "Error: set EXA_API_KEY in env or .env"; exit 1; }
+	@test -n "$$GOOGLE_API_KEY" || (test -f .env && grep -q GOOGLE_API_KEY .env) || { echo "Error: set GOOGLE_API_KEY and GOOGLE_CSE_ID in env or .env"; exit 1; }
 	uv run fetch.py
 	uv run fetch.py foodie
 

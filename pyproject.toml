@@ -5,6 +5,5 @@ requires-python = "===3.13.2"
 dependencies = [
     "requests==2.34.2",
     "truststore==0.10.4",
-    "exa-py==2.13.0",
     "python-dotenv==1.2.2",
 ]
