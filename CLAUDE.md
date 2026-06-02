@@ -14,6 +14,7 @@ fetch.py          — two modes:
 index.html        — the entire frontend (inline CSS + JS), no build step
 Makefile          — make db-copy / make db-smoketest / make db / make site / make dev / make clean
 pyproject.toml    — uv project, all deps pinned ==x.y.z, Python pinned ===x.y.z
+.env.sample       — template for .env (checked in)
 .env              — GOOGLE_API_KEY + GOOGLE_CSE_ID (gitignored)
 .site/            — build output dir (gitignored), served by make dev / GitHub Pages
 .site/data/*.json — pre-fetched restaurant data per city
@@ -29,7 +30,7 @@ make dev                               # serve on :8080 with file watching
 
 To rebuild data from scratch (requires Google API credentials):
 ```bash
-printf "GOOGLE_API_KEY=your-key\nGOOGLE_CSE_ID=your-cx" > .env  # one-time setup
+cp .env.sample .env                    # one-time setup, then fill in keys
 make db-smoketest                      # quick: 2 cities, 100 restaurants each
 make db                                # full: all cities, all restaurants (~15min)
 ```

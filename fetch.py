@@ -101,37 +101,21 @@ def get_restaurant_name(r: dict) -> str:
     return r.get("name", "")
 
 
-GOOGLE_CSE_URL = "https://www.googleapis.com/customsearch/v1"
-
-
-def fetch_urls(restaurant: str, city: str,
-               api_key: str, cse_id: str, max_retries: int = 3) -> list[str] | None:
+def fetch_urls(restaurant: str, city: str, cse, cse_id: str,
+               num_retries: int = 3) -> list[str] | None:
     query = f'"{restaurant}" {city} restaurant'
-
-    for attempt in range(max_retries):
-        try:
-            resp = requests.get(GOOGLE_CSE_URL, params={
-                "key": api_key,
-                "cx": cse_id,
-                "q": query,
-                "num": 5,
-            }, timeout=30)
-            resp.raise_for_status()
-            data = resp.json()
-            return [item["link"] for item in data.get("items", [])]
-        except requests.exceptions.RequestException as e:
-            if attempt < max_retries - 1:
-                wait = 2 ** attempt
-                print(f"    retry {attempt + 1}/{max_retries} in {wait}s: {e}")
-                time.sleep(wait)
-                continue
-            print(f"    FAILED after {max_retries} attempts: {e}")
-            return None
+    try:
+        data = cse.list(q=query, cx=cse_id, num=5).execute(num_retries=num_retries)
+        return [item["link"] for item in data.get("items", [])]
+    except Exception as e:
+        print(f"    FAILED: {e}")
+        return None
 
 
 def foodie_main(quick: bool = False):
     """Augment saved restaurant data with foodie URLs from Google Custom Search."""
     from dotenv import load_dotenv
+    from googleapiclient.discovery import build
 
     load_dotenv()
     api_key = os.environ.get("GOOGLE_API_KEY")
@@ -139,6 +123,8 @@ def foodie_main(quick: bool = False):
     if not api_key or not cse_id:
         print("Error: set GOOGLE_API_KEY and GOOGLE_CSE_ID in .env", file=sys.stderr)
         sys.exit(1)
+
+    cse = build("customsearch", "v1", developerKey=api_key).cse()
 
     with open("cities.json") as f:
         cities = json.load(f)
@@ -171,7 +157,7 @@ def foodie_main(quick: bool = False):
                 r["foodie_urls"] = []
                 continue
 
-            urls = fetch_urls(name, city["name"], api_key, cse_id)
+            urls = fetch_urls(name, city["name"], cse, cse_id)
             r["foodie_urls"] = urls if urls is not None else None
             updated += 1
 
