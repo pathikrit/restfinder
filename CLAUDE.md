@@ -7,7 +7,7 @@ RestFinder — a static restaurant finder app. Shows restaurants on a map with d
 ## File layout
 
 ```
-cities.json       — city definitions: center, zoom, bbox (for Overpass), foodie_sites (for Google CSE)
+cities.json       — city definitions: center, zoom, bbox (for Overpass)
 fetch.py          — two modes:
                       `uv run fetch.py`        → fetch restaurants from Overpass API
                       `uv run fetch.py foodie`  → augment with foodie URLs from Google Custom Search
@@ -46,7 +46,7 @@ make db                                # full: all cities, all restaurants (~15m
 ## Data flow
 
 1. `fetch.py` queries Overpass API with each city's `bbox` → raw restaurant data with full OSM `tags`
-2. `fetch.py foodie` reads the saved JSON, queries Google Custom Search for each named restaurant against the city's `foodie_sites`, adds `foodie_urls` to each restaurant object
+2. `fetch.py foodie` reads the saved JSON, queries Google Custom Search for each named restaurant, adds `foodie_urls` to each restaurant object
 3. `make site` copies static assets into `.site/`
 4. `index.html` loads `cities.json` (for tabs) and `data/{key}.json` (for restaurants) — zero API calls at runtime
 
@@ -74,7 +74,7 @@ make db                                # full: all cities, all restaurants (~15m
 - **Raw data**: `fetch.py` stores data as close to the API response as possible. All formatting (address assembly, cuisine semicolons→commas, etc.) happens in `index.html` JavaScript.
 - **Incremental foodie**: `fetch.py foodie` skips restaurants that already have a `foodie_urls` key, so re-runs only process new restaurants.
 - **SSL**: `truststore` is used to handle corporate proxy SSL interception.
-- **Google CSE**: Create a Programmable Search Engine at https://programmablesearchengine.google.com/ configured to search the whole web. Site restriction is done per-query via `site:` operators using each city's `foodie_sites`. Free tier: 100 queries/day; paid: $5 per 1000 queries.
+- **Google CSE**: Create a Programmable Search Engine at https://programmablesearchengine.google.com/ with foodie sites configured there. Free tier: 100 queries/day; paid: $5 per 1000 queries.
 - **No framework**: single HTML file with inline CSS/JS, Leaflet via CDN. No build tools, no npm.
 
 ## Frontend architecture (index.html)
@@ -96,6 +96,6 @@ make db                                # full: all cities, all restaurants (~15m
 
 ## Adding a new city
 
-1. Add entry to `cities.json` with `key`, `name`, `lat`, `lng`, `zoom`, `bbox`, `foodie_sites`
+1. Add entry to `cities.json` with `key`, `name`, `lat`, `lng`, `zoom`, `bbox`
 2. Run `make db` — it fetches restaurants and foodie URLs for all cities
 3. The frontend picks it up automatically (tabs built from `cities.json`)

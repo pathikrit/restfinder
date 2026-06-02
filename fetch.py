@@ -104,10 +104,9 @@ def get_restaurant_name(r: dict) -> str:
 GOOGLE_CSE_URL = "https://www.googleapis.com/customsearch/v1"
 
 
-def fetch_urls(restaurant: str, city: str, foodie_sites: list[str],
+def fetch_urls(restaurant: str, city: str,
                api_key: str, cse_id: str, max_retries: int = 3) -> list[str] | None:
-    site_filter = " OR ".join(f"site:{s}" for s in foodie_sites)
-    query = f'"{restaurant}" {city} restaurant ({site_filter})'
+    query = f'"{restaurant}" {city} restaurant'
 
     for attempt in range(max_retries):
         try:
@@ -148,11 +147,6 @@ def foodie_main(quick: bool = False):
         cities = cities[:2]
 
     for city in cities:
-        foodie_sites = city.get("foodie_sites", [])
-        if not foodie_sites:
-            print(f"Skipping {city['name']}: no foodie_sites configured")
-            continue
-
         data_path = os.path.join(DATA_DIR, f"{city['key']}.json")
         if not os.path.exists(data_path):
             print(f"Skipping {city['name']}: {data_path} not found (run make fetch first)")
@@ -177,7 +171,7 @@ def foodie_main(quick: bool = False):
                 r["foodie_urls"] = []
                 continue
 
-            urls = fetch_urls(name, city["name"], foodie_sites, api_key, cse_id)
+            urls = fetch_urls(name, city["name"], api_key, cse_id)
             r["foodie_urls"] = urls if urls is not None else None
             updated += 1
 
