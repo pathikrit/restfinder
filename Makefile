@@ -1,4 +1,4 @@
-.PHONY: db db-copy db-smoketest site dev clean
+.PHONY: check-key db db-copy db-smoketest site dev clean
 
 PAGES_URL := https://pathikrit.github.io/restfinder
 
@@ -12,13 +12,14 @@ db-copy:
 		done
 	@echo "Done."
 
-db-smoketest:
+check-key:
 	@test -n "$$GOOGLE_API_KEY" || (test -f .env && grep -q GOOGLE_API_KEY .env) || { echo "Error: set GOOGLE_API_KEY and GOOGLE_CSE_ID in env or .env"; exit 1; }
+
+db-smoketest: check-key
 	uv run fetch.py --quick
 	uv run fetch.py foodie --quick
 
-db:
-	@test -n "$$GOOGLE_API_KEY" || (test -f .env && grep -q GOOGLE_API_KEY .env) || { echo "Error: set GOOGLE_API_KEY and GOOGLE_CSE_ID in env or .env"; exit 1; }
+db: check-key
 	uv run fetch.py
 	uv run fetch.py foodie
 
