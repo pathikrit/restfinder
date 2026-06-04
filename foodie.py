@@ -80,8 +80,16 @@ def main(quick: bool = False):
         with open(data_path) as f:
             restaurants = json.load(f)
 
-        # Collect restaurants needing search
+        # Count name occurrences to detect chains (>5 locations = chain)
+        from collections import Counter
+        name_counts = Counter((r.get("name") or "").strip().lower() for r in restaurants)
+        chains = {n for n, c in name_counts.items() if c > 5}
+        if chains:
+            print(f"  Skipping {len(chains)} chains: {', '.join(sorted(chains)[:10])}{'...' if len(chains) > 10 else ''}")
+
+        # Collect restaurants needing search — deduplicate by name, skip chains
         sites_query = " OR ".join(foodie_sites)
+        seen_names = set()
         to_search = []
         for i, r in enumerate(restaurants):
             if "foodie_urls" in r:
@@ -90,6 +98,13 @@ def main(quick: bool = False):
             if not name:
                 r["foodie_urls"] = []
                 continue
+            name_lower = name.lower()
+            if name_lower in chains:
+                r["foodie_urls"] = []
+                continue
+            if name_lower in seen_names:
+                continue
+            seen_names.add(name_lower)
             to_search.append((i, {"q": f'"{name}" restaurant {city["name"]} site:({sites_query})', "num": 5}))
 
         skipped = len(restaurants) - len(to_search) - sum(1 for r in restaurants if "foodie_urls" not in r and not (r.get("name") or "").strip())
@@ -121,6 +136,15 @@ def main(quick: bool = False):
                     json.dump(restaurants, f)
                 found = sum(1 for r in restaurants if r.get("foodie_urls"))
                 print(f"  {searched}/{len(to_search)} searched, {found} with URLs", flush=True)
+
+        # Propagate results to duplicate names
+        name_to_urls = {}
+        for r in restaurants:
+            if r.get("foodie_urls") is not None:
+                name_to_urls[(r.get("name") or "").strip().lower()] = r["foodie_urls"]
+        for r in restaurants:
+            if "foodie_urls" not in r:
+                r["foodie_urls"] = name_to_urls.get((r.get("name") or "").strip().lower(), [])
 
         # Filter to restaurants with >=2 distinct foodie domains
         def distinct_domains(urls):
