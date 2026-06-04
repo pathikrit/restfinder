@@ -216,7 +216,7 @@
         let activeCity = null;
         let cityData = {};
         let markers = {};
-        let colFilters = { name: '', cuisine: '', address: '' };
+        let colFilters = { name: '', cuisine: '', address: '', mentions: '' };
 
         // --- Last updated ---
         const updatedMeta = document.querySelector('meta[name="last-updated"]');
@@ -313,6 +313,10 @@
                 const q = colFilters.address.toLowerCase();
                 visible = visible.filter(r => (r.address || '').toLowerCase().includes(q));
             }
+            if (colFilters.mentions) {
+                const q = colFilters.mentions.toLowerCase();
+                visible = visible.filter(r => (r.foodie_urls || []).some(u => u.toLowerCase().includes(q)));
+            }
 
             markerLayer.clearLayers();
             markers = {};
@@ -338,7 +342,7 @@
             const filterInput = (key) => `<div class="col-filter"><input type="text" data-filter="${key}" placeholder="Filter..." value="${esc(colFilters[key])}"><button class="clear-btn" data-clear="${key}">&times;</button></div>`;
             let html = `<table><thead><tr>
                 <th>#</th><th>Name${filterInput('name')}</th><th>Cuisine${filterInput('cuisine')}</th><th>Address${filterInput('address')}</th>
-                <th>Phone</th><th>Mentions</th>
+                <th>Phone</th><th>Mentions${filterInput('mentions')}</th>
                 </tr></thead><tbody>`;
             visible.forEach((r, i) => {
                 const name = r.name || 'Unnamed';
@@ -350,7 +354,7 @@
                     <td>${i + 1}</td>
                     <td title="${esc(name)}">${esc(name)}</td>
                     <td title="${esc(cuisine)}">${esc(cuisine)}</td>
-                    <td title="${esc(address)}"><address style="font-style:normal">${esc(address)}</address></td>
+                    <td title="${esc(address)}"><address style="font-style:normal">${address ? `<a href="https://www.google.com/maps/search/${encodeURIComponent(name + ', ' + address)}" target="_blank" rel="noopener">${esc(address)}</a>` : ''}</address></td>
                     <td>${phone ? `<a href="tel:${esc(phone)}">${esc(phone)}</a>` : ''}</td>
                     <td>${foodie}</td></tr>`;
             });
