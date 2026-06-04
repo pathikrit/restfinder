@@ -282,7 +282,9 @@
 
         function formatFoodieLinks(urls) {
             if (!urls || !urls.length) return '';
-            return urls.map(url => {
+            return urls.filter(url => {
+                try { return !new URL(url).hostname.includes('theinfatuation.com'); } catch { return true; }
+            }).map(url => {
                 const parts = new URL(url).hostname.replace(/^www\./, '').split('.');
                 const domain = (parts.length > 2 ? parts.slice(1, -1) : parts.slice(0, -1)).join('.')
                     .replace(/\b\w/g, c => c.toUpperCase());
