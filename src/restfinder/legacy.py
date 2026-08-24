@@ -15,6 +15,7 @@ import psycopg
 
 from restfinder.config import database_url
 from restfinder.kmz import ExistingRestaurant, KMZPlace, match_existing_restaurants, normalize_name
+from restfinder.names import display_name
 
 SOURCE = "legacy_site"
 DEFAULT_SNAPSHOT_AT = datetime(2026, 6, 4, tzinfo=timezone.utc)
@@ -106,7 +107,7 @@ def load_legacy_json(path: Path) -> list[LegacyRestaurant]:
         restaurants.append(
             LegacyRestaurant(
                 source_id=source_id,
-                name=name,
+                name=display_name(name),
                 cuisine=optional_text(row.get("cuisine")),
                 address=optional_text(row.get("address")),
                 phone=optional_text(row.get("phone")),

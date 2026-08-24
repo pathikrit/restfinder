@@ -13,6 +13,7 @@ import psycopg
 from psycopg.rows import dict_row
 
 from restfinder.config import database_url
+from restfinder.names import display_name
 
 OUTPUT_PATH = Path(".site/data/nyc.json")
 
@@ -87,7 +88,7 @@ def export_rows(*, connection_url: str) -> list[dict[str, Any]]:
             {
                 "id": row["id"],
                 "source": row["source"],
-                "name": row["name"],
+                "name": display_name(row["name"]),
                 "type": row["type"],
                 "cuisine": row["cuisine"],
                 "address": row["address"],

@@ -16,7 +16,7 @@ def restaurant(identifier: int, name: str) -> Restaurant:
     )
 
 
-def test_transform_row_uses_namespaced_camis_and_preserves_source_text():
+def test_transform_row_uses_namespaced_camis_and_formats_display_name():
     result = transform_row(
         {
             "camis": "50000001",
@@ -33,7 +33,7 @@ def test_transform_row_uses_namespaced_camis_and_preserves_source_text():
     )
 
     assert result.id == "nyc_dohmh:50000001"
-    assert result.name == "McDONALD'S"
+    assert result.name == "McDonald's"
     assert result.address == "12 WEST 34 STREET, Manhattan, 10001"
     assert result.latitude == 40.75
     assert result.longitude == -73.99

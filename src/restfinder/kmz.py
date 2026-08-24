@@ -19,6 +19,8 @@ from zipfile import BadZipFile, ZipFile
 import psycopg
 import requests
 
+from restfinder.names import display_name
+
 KML_NAMESPACE = "http://www.opengis.net/kml/2.2"
 NAMESPACES = {"kml": KML_NAMESPACE}
 RESTAURANT_CATEGORIES = {
@@ -166,16 +168,17 @@ def parse_kmz(path: Path) -> KMZDocument:
     for folder in document.findall("kml:Folder", NAMESPACES):
         category = text(folder, "kml:name") or "Uncategorized"
         for index, placemark in enumerate(folder.findall("kml:Placemark", NAMESPACES), start=1):
-            name = text(placemark, "kml:name")
-            if not name:
+            source_name = text(placemark, "kml:name")
+            if not source_name:
                 raise ValueError(f"{category!r} placemark {index} is missing a name")
+            name = display_name(source_name)
             latitude, longitude = parse_coordinates(
                 text(placemark, ".//kml:Point/kml:coordinates"),
                 place_name=name,
             )
             places.append(
                 KMZPlace(
-                    source_id=stable_source_id(category, name, latitude, longitude),
+                    source_id=stable_source_id(category, source_name, latitude, longitude),
                     name=name,
                     category=category,
                     description=text(placemark, "kml:description"),

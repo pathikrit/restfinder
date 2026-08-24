@@ -15,6 +15,7 @@ import truststore
 from urllib3.util.retry import Retry
 
 from restfinder.config import database_url, nyc_open_data_app_token
+from restfinder.names import display_name
 
 truststore.inject_into_ssl()
 
@@ -81,7 +82,7 @@ def transform_row(row: dict[str, Any]) -> Restaurant:
     return Restaurant(
         id=f"{SOURCE}:{camis}",
         source=SOURCE,
-        name=clean(row.get("name")) or "Unnamed establishment",
+        name=display_name(clean(row.get("name")) or "Unnamed establishment"),
         cuisine=clean(row.get("cuisine")),
         address=build_address(row),
         phone=clean(row.get("phone")),
