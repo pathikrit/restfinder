@@ -1,406 +1,218 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="last-updated" content="">
-    <title>Restaurant Finder</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍴</text></svg>">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
-    <link rel="stylesheet" href="https://kit.fontawesome.com/a22be8527e.css" crossorigin="anonymous">
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #e2e8f0; }
-
-        #city-tabs {
-            display: flex;
-            background: #0f172a;
-            padding: 0 12px;
-            border-bottom: 1px solid #1e293b;
-        }
-        #city-tabs button {
-            padding: 10px 20px;
-            background: none;
-            border: none;
-            color: #64748b;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            border-bottom: 3px solid transparent;
-            transition: color 0.15s, border-color 0.15s;
-        }
-        #city-tabs button:hover { color: #cbd5e1; }
-        #city-tabs button.active { color: #f1f5f9; border-bottom-color: #3b82f6; }
-        #city-tabs button:disabled { color: #334155; cursor: not-allowed; }
-        #city-tabs button:disabled:hover { color: #334155; }
-
-        #github-link {
-            display: flex;
-            align-items: center;
-            padding: 0 14px;
-            color: #64748b;
-            font-size: 20px;
-            text-decoration: none;
-            transition: color 0.15s;
-        }
-        #github-link:hover { color: #f1f5f9; }
-
-        #last-updated {
-            margin-left: auto;
-            display: flex;
-            align-items: center;
-            color: #475569;
-            font-size: 11px;
-        }
-
-        #map-wrap { position: relative; height: 50%; }
-        #map { width: 100%; height: 100%; }
-
-        #table-wrap {
-            height: calc(50% - 40px);
-            overflow-y: auto;
-            background: #0f172a;
-        }
-        #table-wrap table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 13px;
-        }
-        #table-wrap thead {
-            position: sticky;
-            top: 0;
-            background: #1e293b;
-        }
-        #table-wrap th {
-            text-align: left;
-            padding: 8px 10px;
-            font-weight: 600;
-            color: #94a3b8;
-            border-bottom: 2px solid #334155;
-        }
-        #table-wrap td {
-            padding: 7px 10px;
-            border-bottom: 1px solid #1e293b;
-            color: #cbd5e1;
-            max-width: 220px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-        #table-wrap tr.data-row { cursor: pointer; }
-        #table-wrap tr.data-row:hover { background: #1e293b; }
-        #table-wrap tr.data-row.selected { background: #1e3a5f; }
-        #table-wrap td a { color: #60a5fa; text-decoration: none; }
-        #table-wrap td a:hover { text-decoration: underline; }
-        #table-wrap td a.foodie-link { color: #f59e0b; }
-        .col-filter {
-            display: flex;
-            align-items: center;
-            margin-top: 4px;
-            position: relative;
-        }
-        .col-filter input {
-            width: 100%;
-            padding: 3px 20px 3px 6px;
-            border: 1px solid #334155;
-            border-radius: 4px;
-            background: #0f172a;
-            color: #e2e8f0;
-            font-size: 11px;
-            outline: none;
-        }
-        .col-filter input::placeholder { color: #475569; }
-        .col-filter input:focus { border-color: #3b82f6; }
-        .col-filter .clear-btn {
-            position: absolute;
-            right: 3px;
-            background: none;
-            border: none;
-            color: #475569;
-            font-size: 13px;
-            cursor: pointer;
-            display: none;
-            line-height: 1;
-            padding: 0 2px;
-        }
-        .col-filter .clear-btn:hover { color: #e2e8f0; }
-        .col-filter input:not(:placeholder-shown) + .clear-btn { display: block; }
-        .red-marker { filter: hue-rotate(150deg) saturate(2); }
-        .pin-label {
-            font-size: 12px;
-            font-weight: 600;
-            background: rgba(15, 23, 42, 0.85);
-            color: #f1f5f9;
-            border: 1px solid #334155;
-            border-radius: 4px;
-            padding: 2px 6px;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.3);
-        }
-        #placeholder {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 100%;
-            color: #475569;
-            font-size: 15px;
-        }
-    </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Rick's Restaurant Finder</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍴</text></svg>">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b1120;
+      --panel: #111827;
+      --panel-soft: #1f2937;
+      --line: #334155;
+      --text: #e5e7eb;
+      --muted: #94a3b8;
+      --accent: #f59e0b;
+      --blue: #60a5fa;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    body { display: grid; grid-template-rows: auto minmax(260px, 55vh) 1fr; overflow: hidden; }
+    header { display: flex; align-items: center; gap: 18px; min-height: 48px; padding: 8px 16px; border-bottom: 1px solid var(--line); background: var(--panel); }
+    h1 { margin: 0; font-size: 16px; letter-spacing: .01em; }
+    .status { margin-left: auto; color: var(--muted); font-size: 12px; text-align: right; }
+    .github { color: var(--muted); text-decoration: none; font-weight: 700; }
+    .github:hover { color: var(--text); }
+    #map { width: 100%; height: 100%; }
+    #table-wrap { overflow: auto; border-top: 1px solid var(--line); }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead { position: sticky; top: 0; z-index: 2; background: var(--panel); }
+    th { padding: 8px 10px; border-bottom: 2px solid var(--line); color: var(--muted); text-align: left; vertical-align: top; }
+    td { max-width: 280px; padding: 8px 10px; border-bottom: 1px solid #1e293b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    tbody tr { cursor: pointer; }
+    tbody tr:hover, tbody tr.selected { background: var(--panel-soft); }
+    a { color: var(--blue); }
+    .reference { color: var(--accent); }
+    .filter { position: relative; margin-top: 5px; }
+    .filter input { width: 100%; min-width: 90px; padding: 5px 7px; border: 1px solid var(--line); border-radius: 5px; outline: none; background: var(--bg); color: var(--text); font: inherit; font-size: 11px; }
+    .filter input:focus { border-color: var(--blue); }
+    .empty { display: grid; min-height: 160px; place-items: center; padding: 24px; color: var(--muted); text-align: center; }
+    .pin-label { padding: 2px 6px; border: 1px solid var(--line); border-radius: 4px; background: rgba(11,17,32,.9); color: var(--text); font-weight: 650; }
+    @media (max-width: 700px) {
+      body { grid-template-rows: auto minmax(230px, 48vh) 1fr; }
+      header { gap: 8px; padding: 8px 10px; }
+      h1 { font-size: 14px; }
+      .status { font-size: 10px; }
+      th, td { padding: 7px; }
+      .phone-column { display: none; }
+    }
+  </style>
 </head>
 <body>
-    <nav id="city-tabs"><span id="last-updated"></span></nav>
-    <div id="map-wrap">
-        <div id="map"></div>
-    </div>
-    <div id="table-wrap">
-        <div id="placeholder">Loading...</div>
-    </div>
+  <header>
+    <h1>Rick's Restaurant Finder</h1>
+    <span id="status" class="status">Loading…</span>
+    <a class="github" href="https://github.com/pathikrit/restfinder" target="_blank" rel="noopener" aria-label="GitHub repository">GitHub</a>
+  </header>
+  <main id="map" aria-label="Restaurant map"></main>
+  <section id="table-wrap" aria-live="polite"><div class="empty">Loading restaurants…</div></section>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-    <script>
-        const map = L.map('map');
-        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        }).addTo(map);
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script>
+    const filters = { name: '', cuisine: '', address: '', references: '' };
+    const markers = new Map();
+    let restaurants = [];
 
-        L.Control.ResetView = L.Control.extend({
-            onAdd() {
-                const btn = L.DomUtil.create('div', 'leaflet-bar');
-                btn.innerHTML = '<a href="#" title="Reset view" style="font-size:16px;display:flex;align-items:center;justify-content:center;width:30px;height:30px"><i class="fa-solid fa-house"></i></a>';
-                btn.querySelector('a').addEventListener('click', e => {
-                    e.preventDefault();
-                    const city = cities.find(c => c.key === activeCity);
-                    if (city) map.setView([city.lat, city.lng], city.zoom);
-                });
-                L.DomEvent.disableClickPropagation(btn);
-                return btn;
-            }
+    const map = L.map('map');
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    }).addTo(map);
+    const markerLayer = L.layerGroup().addTo(map);
+    const defaultIcon = L.icon({
+      iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+      shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+      iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
+    });
+
+    function escapeHtml(value) {
+      return String(value == null ? '' : value).replace(/[&<>"']/g, character => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
+      })[character]);
+    }
+
+    function referenceHtml(item) {
+      const value = item.reference || '';
+      try {
+        const url = new URL(value);
+        if (url.protocol === 'http:' || url.protocol === 'https:') {
+          const label = url.hostname.replace(/^www\./, '');
+          return `<a class="reference" href="${escapeHtml(url.href)}" target="_blank" rel="noopener">${escapeHtml(label)}</a>`;
+        }
+      } catch (_) {}
+      return `<span class="reference">${escapeHtml(value)}</span>`;
+    }
+
+    function referencesHtml(items) {
+      return (items || []).map(referenceHtml).join(', ');
+    }
+
+    function referenceSearchText(restaurant) {
+      return (restaurant.references || []).map(item => item.reference || '').join(' ').toLowerCase();
+    }
+
+    function filteredRestaurants() {
+      if (!restaurants.length) return [];
+      const bounds = map.getBounds();
+      return restaurants.filter(restaurant =>
+        bounds.contains([restaurant.lat, restaurant.lon]) &&
+        (!filters.name || (restaurant.name || '').toLowerCase().includes(filters.name)) &&
+        (!filters.cuisine || (restaurant.cuisine || '').toLowerCase().includes(filters.cuisine)) &&
+        (!filters.address || (restaurant.address || '').toLowerCase().includes(filters.address)) &&
+        (!filters.references || referenceSearchText(restaurant).includes(filters.references))
+      );
+    }
+
+    function filterInput(key) {
+      return `<div class="filter"><input data-filter="${key}" value="${escapeHtml(filters[key])}" placeholder="Filter…" aria-label="Filter ${key}"></div>`;
+    }
+
+    function selectRestaurant(id) {
+      document.querySelectorAll('tbody tr').forEach(row => row.classList.toggle('selected', row.dataset.id === id));
+      const marker = markers.get(id);
+      if (marker) {
+        map.panTo(marker.getLatLng());
+        marker.openPopup();
+      }
+    }
+
+    function render() {
+      const visible = filteredRestaurants();
+      markerLayer.clearLayers();
+      markers.clear();
+
+      visible.forEach(restaurant => {
+        const address = restaurant.address || '';
+        const mapQuery = encodeURIComponent(`${restaurant.name}, ${address}`);
+        const popup = [
+          `<strong>${escapeHtml(restaurant.name)}</strong>`,
+          restaurant.cuisine ? escapeHtml(restaurant.cuisine) : '',
+          address ? `<a href="https://www.google.com/maps/search/${mapQuery}" target="_blank" rel="noopener">${escapeHtml(address)}</a>` : '',
+          restaurant.phone ? `<a href="tel:${escapeHtml(restaurant.phone)}">${escapeHtml(restaurant.phone)}</a>` : '',
+          referencesHtml(restaurant.references)
+        ].filter(Boolean).join('<br>');
+        const marker = L.marker([restaurant.lat, restaurant.lon], { icon: defaultIcon }).bindPopup(popup);
+        if (visible.length <= 10) marker.bindTooltip(restaurant.name, { permanent: true, direction: 'top', className: 'pin-label' });
+        marker.addTo(markerLayer);
+        markers.set(restaurant.id, marker);
+      });
+
+      const wrap = document.getElementById('table-wrap');
+      if (!restaurants.length) {
+        wrap.innerHTML = '<div class="empty">No referenced restaurants have been published yet.</div>';
+        return;
+      }
+      let html = `<table><thead><tr>
+        <th>#</th>
+        <th>Name${filterInput('name')}</th>
+        <th>Cuisine${filterInput('cuisine')}</th>
+        <th>Address${filterInput('address')}</th>
+        <th class="phone-column">Phone</th>
+        <th>References${filterInput('references')}</th>
+      </tr></thead><tbody>`;
+      visible.forEach((restaurant, index) => {
+        const address = restaurant.address || '';
+        const mapQuery = encodeURIComponent(`${restaurant.name}, ${address}`);
+        html += `<tr data-id="${escapeHtml(restaurant.id)}">
+          <td>${index + 1}</td>
+          <td title="${escapeHtml(restaurant.name)}">${escapeHtml(restaurant.name)}</td>
+          <td title="${escapeHtml(restaurant.cuisine || '')}">${escapeHtml(restaurant.cuisine || '')}</td>
+          <td title="${escapeHtml(address)}">${address ? `<a href="https://www.google.com/maps/search/${mapQuery}" target="_blank" rel="noopener">${escapeHtml(address)}</a>` : ''}</td>
+          <td class="phone-column">${restaurant.phone ? `<a href="tel:${escapeHtml(restaurant.phone)}">${escapeHtml(restaurant.phone)}</a>` : ''}</td>
+          <td>${referencesHtml(restaurant.references)}</td>
+        </tr>`;
+      });
+      wrap.innerHTML = `${html}</tbody></table>`;
+      wrap.querySelectorAll('input[data-filter]').forEach(input => {
+        input.addEventListener('input', event => {
+          filters[event.target.dataset.filter] = event.target.value.trim().toLowerCase();
+          render();
+          const replacement = document.querySelector(`input[data-filter="${event.target.dataset.filter}"]`);
+          replacement.focus();
+          replacement.setSelectionRange(replacement.value.length, replacement.value.length);
         });
-        new L.Control.ResetView({ position: 'topleft' }).addTo(map);
+      });
+      wrap.querySelectorAll('tbody tr').forEach(row => row.addEventListener('click', event => {
+        if (!event.target.closest('a')) selectRestaurant(row.dataset.id);
+      }));
+    }
 
-        const markerLayer = L.layerGroup().addTo(map);
-        const tableWrap = document.getElementById('table-wrap');
-        const tabsNav = document.getElementById('city-tabs');
-
-        const defaultIcon = L.icon({
-            iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
-            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-            iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
-        });
-        const redIcon = L.icon({
-            iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
-            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-            iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41],
-            className: 'red-marker'
-        });
-        const whimsyIcon = L.divIcon({
-            html: '<span style="font-size:28px">&#x1F47B;</span>',
-            className: '', iconSize: [28, 28], iconAnchor: [14, 28], popupAnchor: [0, -28]
-        });
-
-        function distinctDomains(urls) {
-            if (!urls || !urls.length) return new Set();
-            const domains = new Set();
-            urls.forEach(u => { try { domains.add(new URL(u).hostname.replace('archive.', 'www.')); } catch {} });
-            return domains;
-        }
-
-        function pickIcon(r) {
-            const domains = distinctDomains(r.foodie_urls);
-            if (domains.has('www.atlasobscura.com')) return whimsyIcon;
-            if (domains.size >= 2) return redIcon;
-            return defaultIcon;
-        }
-
-        let cities = [];
-        let activeCity = null;
-        let cityData = {};
-        let markers = {};
-        let colFilters = { name: '', cuisine: '', address: '', mentions: '' };
-
-        // --- Last updated ---
-        const updatedMeta = document.querySelector('meta[name="last-updated"]');
-        if (updatedMeta && updatedMeta.content) {
-            document.getElementById('last-updated').textContent = 'Updated: ' + updatedMeta.content;
-        }
-
-        function esc(s) {
-            const d = document.createElement('div');
-            d.textContent = s;
-            return d.innerHTML;
-        }
-
-        // --- Load cities.json and bootstrap ---
-        fetch('cities.json').then(r => r.json()).then(allCities => {
-            cities = allCities.filter(c => c.enabled !== false);
-            const lastUpdated = document.getElementById('last-updated');
-            allCities.forEach(city => {
-                const btn = document.createElement('button');
-                btn.textContent = city.name;
-                btn.dataset.key = city.key;
-                if (city.enabled !== false) {
-                    btn.addEventListener('click', () => selectCity(city.key));
-                } else {
-                    btn.disabled = true;
-                    btn.title = 'Coming soon';
-                }
-                tabsNav.insertBefore(btn, lastUpdated);
-            });
-            const ghLink = document.createElement('a');
-            ghLink.href = 'https://github.com/pathikrit/restfinder';
-            ghLink.target = '_blank';
-            ghLink.rel = 'noopener';
-            ghLink.id = 'github-link';
-            ghLink.innerHTML = '<i class="fa-brands fa-github"></i>';
-            tabsNav.appendChild(ghLink);
-            selectCity(cities[0].key);
-        });
-
-        async function selectCity(key) {
-            activeCity = key;
-            tabsNav.querySelectorAll('button').forEach(b =>
-                b.classList.toggle('active', b.dataset.key === key));
-            const city = cities.find(c => c.key === key);
-            map.setView([city.lat, city.lng], city.zoom);
-
-            tableWrap.innerHTML = '<div id="placeholder">Loading...</div>';
-            try {
-                await loadCityData(key);
-                updateView();
-            } catch (err) {
-                console.error(err);
-                tableWrap.innerHTML = '<div id="placeholder">Failed to load restaurant data.</div>';
-            }
-        }
-
-        async function loadCityData(key) {
-            if (cityData[key]) return;
-            const resp = await fetch(`data/${key}.json`);
-            if (!resp.ok) throw new Error(`Failed to load data/${key}.json`);
-            const data = await resp.json();
-            const counts = {};
-            data.forEach(r => { const n = (r.name || '').toLowerCase(); counts[n] = (counts[n] || 0) + 1; });
-            cityData[key] = data.filter(r => (counts[(r.name || '').toLowerCase()] || 0) <= 5);
-        }
-
-        function formatFoodieLinks(urls) {
-            if (!urls || !urls.length) return '';
-            return urls.filter(url => {
-                try { return !new URL(url).hostname.includes('theinfatuation.com'); } catch { return true; }
-            }).map(url => {
-                const parts = new URL(url).hostname.replace(/^www\./, '').split('.');
-                const domain = (parts.length > 2 ? parts.slice(1, -1) : parts.slice(0, -1)).join('.')
-                    .replace(/\b\w/g, c => c.toUpperCase());
-                return `<a href="${esc(url)}" target="_blank" rel="noopener" class="foodie-link">${esc(domain)}</a>`;
-            }).join(', ');
-        }
-
-        // --- Filter to visible bounds and render ---
-        function updateView() {
-            if (!activeCity || !cityData[activeCity]) return;
-            const bounds = map.getBounds();
-            let visible = cityData[activeCity].filter(r =>
-                r.lat >= bounds.getSouth() && r.lat <= bounds.getNorth() &&
-                r.lon >= bounds.getWest() && r.lon <= bounds.getEast()
-            );
-
-            if (colFilters.name) {
-                const q = colFilters.name.toLowerCase();
-                visible = visible.filter(r => (r.name || '').toLowerCase().includes(q));
-            }
-            if (colFilters.cuisine) {
-                const q = colFilters.cuisine.toLowerCase();
-                visible = visible.filter(r => (r.cuisine || '').toLowerCase().includes(q));
-            }
-            if (colFilters.address) {
-                const q = colFilters.address.toLowerCase();
-                visible = visible.filter(r => (r.address || '').toLowerCase().includes(q));
-            }
-            if (colFilters.mentions) {
-                const q = colFilters.mentions.toLowerCase();
-                visible = visible.filter(r => (r.foodie_urls || []).some(u => u.toLowerCase().includes(q)));
-            }
-
-            markerLayer.clearLayers();
-            markers = {};
-            visible.forEach(r => {
-                const name = r.name || 'Unnamed';
-                const cuisine = r.cuisine || '';
-                const address = r.address || '';
-                const phone = r.phone || '';
-
-                let popup = `<strong>${esc(name)}</strong>`;
-                if (cuisine) popup += `<br>${esc(cuisine)}`;
-                if (address) popup += `<br><i class="fa-solid fa-location-dot"></i> <address style="font-style:normal;display:inline">${esc(address)}</address>`;
-                if (phone) popup += `<br><i class="fa-solid fa-phone"></i> <a href="tel:${esc(phone)}">${esc(phone)}</a>`;
-                if (r.foodie_urls && r.foodie_urls.length) {
-                    popup += `<br><strong style="color:#f59e0b">Mentions:</strong> ${formatFoodieLinks(r.foodie_urls)}`;
-                }
-                const m = L.marker([r.lat, r.lon], { icon: pickIcon(r) }).bindPopup(popup);
-                if (visible.length <= 10) m.bindTooltip(name, { permanent: true, direction: 'top', className: 'pin-label' });
-                m.addTo(markerLayer);
-                markers[r.id] = m;
-            });
-
-            const filterInput = (key) => `<div class="col-filter"><input type="text" data-filter="${key}" placeholder="Filter..." value="${esc(colFilters[key])}"><button class="clear-btn" data-clear="${key}">&times;</button></div>`;
-            let html = `<table><thead><tr>
-                <th>#</th><th>Name${filterInput('name')}</th><th>Cuisine${filterInput('cuisine')}</th><th>Address${filterInput('address')}</th>
-                <th>Phone</th><th>Mentions${filterInput('mentions')}</th>
-                </tr></thead><tbody>`;
-            visible.forEach((r, i) => {
-                const name = r.name || 'Unnamed';
-                const cuisine = r.cuisine || '';
-                const address = r.address || '';
-                const phone = r.phone || '';
-                const foodie = formatFoodieLinks(r.foodie_urls);
-                html += `<tr class="data-row" data-id="${r.id}" data-lat="${r.lat}" data-lon="${r.lon}">
-                    <td>${i + 1}</td>
-                    <td title="${esc(name)}">${esc(name)}</td>
-                    <td title="${esc(cuisine)}">${esc(cuisine)}</td>
-                    <td title="${esc(address)}"><address style="font-style:normal">${address ? `<a href="https://www.google.com/maps/search/${encodeURIComponent(name + ', ' + address)}" target="_blank" rel="noopener">${esc(address)}</a>` : ''}</address></td>
-                    <td>${phone ? `<a href="tel:${esc(phone)}">${esc(phone)}</a>` : ''}</td>
-                    <td>${foodie}</td></tr>`;
-            });
-            if (visible.length === 0) {
-                html += `<tr><td colspan="6" style="text-align:center;color:#475569;padding:20px">No matching restaurants.</td></tr>`;
-            }
-            html += '</tbody></table>';
-            const activeFilter = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.filter;
-            tableWrap.innerHTML = html;
-
-            tableWrap.querySelectorAll('.col-filter input').forEach(input => {
-                input.addEventListener('input', e => {
-                    colFilters[e.target.dataset.filter] = e.target.value;
-                    updateView();
-                });
-                input.addEventListener('click', e => e.stopPropagation());
-                if (input.dataset.filter === activeFilter) {
-                    input.focus();
-                    input.setSelectionRange(input.value.length, input.value.length);
-                }
-            });
-            tableWrap.querySelectorAll('.col-filter .clear-btn').forEach(btn => {
-                btn.addEventListener('click', e => {
-                    e.stopPropagation();
-                    colFilters[btn.dataset.clear] = '';
-                    updateView();
-                });
-            });
-
-            tableWrap.querySelectorAll('tr.data-row').forEach(row => {
-                row.addEventListener('click', () => {
-                    tableWrap.querySelectorAll('tr.data-row').forEach(r => r.classList.remove('selected'));
-                    row.classList.add('selected');
-                    const lat = parseFloat(row.dataset.lat);
-                    const lon = parseFloat(row.dataset.lon);
-                    const id = row.dataset.id;
-                    map.setView([lat, lon], 18);
-                    if (markers[id]) markers[id].openPopup();
-                });
-            });
-        }
-
-        map.on('moveend', updateView);
-    </script>
+    Promise.all([
+      fetch('cities.json').then(response => {
+        if (!response.ok) throw new Error('Could not load cities.json');
+        return response.json();
+      }),
+      fetch('data/nyc.json').then(response => {
+        if (!response.ok) throw new Error('Could not load data/nyc.json');
+        return response.json();
+      })
+    ]).then(([cities, data]) => {
+      const city = cities.find(item => item.key === 'nyc');
+      map.setView([city.lat, city.lng], city.zoom);
+      restaurants = data;
+      const latest = restaurants.reduce((value, item) => value > item.last_seen ? value : item.last_seen, '');
+      document.getElementById('status').textContent = `${restaurants.length} curated places${latest ? ` · Updated ${new Date(latest).toLocaleDateString()}` : ''}`;
+      render();
+      map.on('moveend', render);
+    }).catch(error => {
+      console.error(error);
+      document.getElementById('status').textContent = 'Unable to load data';
+      document.getElementById('table-wrap').innerHTML = '<div class="empty">Restaurant data could not be loaded.</div>';
+      map.setView([40.758, -73.9855], 14);
+    });
+  </script>
 </body>
 </html>

@@ -3,7 +3,18 @@ name = "restfinder"
 version = "0.0.1"
 requires-python = "===3.13.2"
 dependencies = [
+    "alembic==1.19.1",
+    "psycopg[binary]==3.3.4",
+    "python-dotenv==1.2.3",
     "requests==2.34.2",
+    "sqlalchemy==2.0.52",
     "truststore==0.10.4",
-    "python-dotenv==1.2.2",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest==9.1.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

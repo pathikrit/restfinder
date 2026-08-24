@@ -1,35 +1,34 @@
-.PHONY: check-keys db db-copy db-smoketest site dev clean
+.PHONY: migrate fetch import import-all export site build dev test clean
 
-check-keys:
-	@test -n "$$SERPER_API_KEY" || (test -f .env && grep -q SERPER_API_KEY .env) || { echo "Error: set SERPER_API_KEY in env or .env"; exit 1; }
+PYTHON := PYTHONPATH=src uv run python
 
-PAGES_URL := https://pathikrit.github.io/restfinder
+migrate:
+	PYTHONPATH=src uv run alembic upgrade head
 
-db-copy:
-	@mkdir -p .site/data
-	@unset SSL_CERT_FILE REQUESTS_CA_BUNDLE; \
-	python3 -c "import json; [print(c['key']) for c in json.load(open('cities.json')) if c.get('enabled', True)]" | \
-		while read key; do \
-			echo "Downloading $$key..."; \
-			curl -sSf "$(PAGES_URL)/data/$$key.json" -o ".site/data/$$key.json"; \
-		done
-	@echo "Done."
+fetch: migrate
+	$(PYTHON) -m restfinder.nyc
 
-db-smoketest:
-	uv run fetcher.py --quick
-	uv run foodie.py --quick
+import: migrate
+	@test -n "$(FILE)" || { echo "Usage: make import FILE=imports/example.json"; exit 1; }
+	$(PYTHON) -m restfinder.references "$(FILE)"
 
-db: check-keys
-	uv run fetcher.py
-	uv run foodie.py
+import-all: migrate
+	$(PYTHON) -m restfinder.references
+
+export: migrate
+	$(PYTHON) -m restfinder.export
 
 site:
-	mkdir -p .site
+	@mkdir -p .site
 	cp -f cities.json index.html .site/
 
-dev: site
-	fswatch -o index.html cities.json | xargs -n1 -I{} cp -f index.html cities.json .site/ &
+build: export site
+
+dev: build
 	python3 -m http.server 8080 -d .site
+
+test:
+	PYTHONPATH=src uv run pytest
 
 clean:
 	rm -rf .site

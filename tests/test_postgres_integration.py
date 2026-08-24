@@ -1,0 +1,88 @@
+from datetime import datetime, timedelta, timezone
+import os
+
+import psycopg
+import pytest
+
+from restfinder.export import export_rows
+from restfinder.nyc import Restaurant, upsert_snapshot
+from restfinder.references import ReferenceManifest, import_manifests
+
+
+TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
+pytestmark = pytest.mark.skipif(not TEST_DATABASE_URL, reason="TEST_DATABASE_URL is not set")
+
+
+def row(identifier: int, *, name: str = "Independent Place", chain: bool = False) -> Restaurant:
+    return Restaurant(
+        id=f"nyc_dohmh:{identifier}",
+        source="nyc_dohmh",
+        name=name,
+        cuisine="Korean",
+        address="1 TEST STREET, Manhattan, 10001",
+        phone="2125550100",
+        latitude=40.75,
+        longitude=-73.99,
+        is_chain=chain,
+    )
+
+
+@pytest.fixture(autouse=True)
+def clean_database():
+    if TEST_DATABASE_URL and "test" not in TEST_DATABASE_URL:
+        pytest.fail("TEST_DATABASE_URL must point to a visibly named test database")
+    with psycopg.connect(TEST_DATABASE_URL) as connection:
+        connection.execute("TRUNCATE restaurant_references, restaurants")
+    yield
+    with psycopg.connect(TEST_DATABASE_URL) as connection:
+        connection.execute("TRUNCATE restaurant_references, restaurants")
+
+
+def test_upsert_import_and_curated_export():
+    first = datetime(2026, 8, 1, tzinfo=timezone.utc)
+    second = first + timedelta(days=1)
+    inserted, updated = upsert_snapshot([row(1), row(2, chain=True)], connection_url=TEST_DATABASE_URL, observed_at=first)
+    assert (inserted, updated) == (2, 0)
+
+    manifest = ReferenceManifest("Rick's Favorites", first, ("nyc_dohmh:1", "nyc_dohmh:2"))
+    assert import_manifests([manifest], connection_url=TEST_DATABASE_URL) == 2
+
+    changed = row(1, name="Updated Independent Place")
+    inserted, updated = upsert_snapshot([changed, row(2, chain=True)], connection_url=TEST_DATABASE_URL, observed_at=second)
+    assert (inserted, updated) == (0, 2)
+
+    with psycopg.connect(TEST_DATABASE_URL) as connection:
+        record = connection.execute(
+            "SELECT first_seen, last_seen, name FROM restaurants WHERE id = 'nyc_dohmh:1'"
+        ).fetchone()
+        assert record == (first, second, "Updated Independent Place")
+        assert connection.execute("SELECT count(*) FROM restaurant_references").fetchone()[0] == 2
+
+    exported = export_rows(connection_url=TEST_DATABASE_URL)
+    assert [item["id"] for item in exported] == ["nyc_dohmh:1"]
+    assert exported[0]["references"][0]["reference"] == "Rick's Favorites"
+
+
+def test_missing_rows_remain_historical_and_are_not_exported():
+    first = datetime(2026, 8, 1, tzinfo=timezone.utc)
+    second = first + timedelta(days=1)
+    upsert_snapshot([row(1), row(2)], connection_url=TEST_DATABASE_URL, observed_at=first)
+    import_manifests(
+        [ReferenceManifest("A list", first, ("nyc_dohmh:1", "nyc_dohmh:2"))],
+        connection_url=TEST_DATABASE_URL,
+    )
+    upsert_snapshot([row(1)], connection_url=TEST_DATABASE_URL, observed_at=second)
+
+    with psycopg.connect(TEST_DATABASE_URL) as connection:
+        assert connection.execute("SELECT count(*) FROM restaurants").fetchone()[0] == 2
+    assert [item["id"] for item in export_rows(connection_url=TEST_DATABASE_URL)] == ["nyc_dohmh:1"]
+
+
+def test_unknown_reference_id_rolls_back_entire_import():
+    now = datetime(2026, 8, 1, tzinfo=timezone.utc)
+    upsert_snapshot([row(1)], connection_url=TEST_DATABASE_URL, observed_at=now)
+    manifest = ReferenceManifest("A list", now, ("nyc_dohmh:1", "nyc_dohmh:999"))
+    with pytest.raises(ValueError, match="Unknown restaurant IDs"):
+        import_manifests([manifest], connection_url=TEST_DATABASE_URL)
+    with psycopg.connect(TEST_DATABASE_URL) as connection:
+        assert connection.execute("SELECT count(*) FROM restaurant_references").fetchone()[0] == 0

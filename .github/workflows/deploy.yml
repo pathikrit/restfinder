@@ -1,8 +1,11 @@
-name: Deploy
+name: Test and deploy
 
 on:
   push:
     branches: [main]
+  pull_request:
+  schedule:
+    - cron: "17 6 1 * *"
   workflow_dispatch:
 
 permissions:
@@ -11,41 +14,65 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  group: pages-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build-deploy:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: restfinder
+          POSTGRES_PASSWORD: restfinder
+          POSTGRES_DB: restfinder_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U restfinder -d restfinder_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://restfinder:restfinder@localhost:5432/restfinder_test
+      TEST_DATABASE_URL: postgresql://restfinder:restfinder@localhost:5432/restfinder_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.9.26"
+          enable-cache: true
+      - run: uv sync --locked
+      - run: make migrate
+      - run: make test
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: test
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url }}
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      NYC_OPEN_DATA_APP_TOKEN: ${{ secrets.NYC_OPEN_DATA_APP_TOKEN }}
     steps:
       - uses: actions/checkout@v4
-
-      - if: ${{ github.event_name == 'workflow_dispatch' }}
-        uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v6
         with:
-          version: "latest"
-
-      - if: ${{ github.event_name == 'workflow_dispatch' }}
-        run: make db
-        env:
-          SERPER_API_KEY: ${{ secrets.SERPER_API_KEY }}
-
-      - if: ${{ github.event_name == 'push' }}
-        run: make db-copy
-
-      - name: Inject last-updated timestamp
-        run: sed -i 's/\(name="last-updated" content="\)[^"]*/\1'"$(date -u +%Y-%m-%d)"'/' index.html
-
+          version: "0.9.26"
+          enable-cache: true
+      - run: uv sync --locked
+      - run: make migrate
+      - if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        run: make fetch
+      - run: make import-all
+      - run: make export
       - run: make site
-
       - uses: actions/configure-pages@v5
-
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .site
-
-      - id: deploy
+      - id: deployment
         uses: actions/deploy-pages@v4
