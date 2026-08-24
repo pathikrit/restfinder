@@ -36,8 +36,8 @@ site:
 
 build: export site
 
-dev: build
-	python3 -m http.server 8080 -d .site
+dev: export
+	$(PYTHON) -m restfinder.dev
 
 test:
 	PYTHONPATH=src uv run pytest

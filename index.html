@@ -41,8 +41,30 @@
     .filter input:focus { border-color: var(--blue); }
     .empty { display: grid; min-height: 160px; place-items: center; padding: 24px; color: var(--muted); text-align: center; }
     .pin-label { padding: 2px 6px; border: 1px solid var(--line); border-radius: 4px; background: rgba(11,17,32,.9); color: var(--text); font-weight: 650; }
-    .emoji-marker { background: transparent; border: 0; }
-    .emoji-marker span { display: block; font-size: 29px; line-height: 34px; text-align: center; filter: drop-shadow(0 2px 2px rgba(0,0,0,.65)); }
+    .map-pin-marker { background: transparent; border: 0; }
+    .map-pin {
+      position: absolute;
+      top: 3px;
+      left: 4px;
+      width: 27px;
+      height: 27px;
+      transform: rotate(-45deg);
+      border: 2px solid #fff;
+      border-radius: 50% 50% 50% 0;
+      background: var(--pin-color);
+      box-shadow: 0 2px 5px rgba(0,0,0,.65);
+    }
+    .map-pin::after {
+      content: '';
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 0 0 1px rgba(0,0,0,.15);
+    }
     @media (max-width: 700px) {
       body { grid-template-rows: auto minmax(230px, 48vh) 1fr; }
       header { gap: 8px; padding: 8px 10px; }
@@ -77,6 +99,15 @@
       'Hidden / Speakeasy': '🤐'
     };
 
+    const typeColor = {
+      'Restaurant': '#dc2626',
+      'Bars': '#7c3aed',
+      'Coffee Shops': '#92400e',
+      'Dessert': '#db2777',
+      'Fast Food': '#ea580c',
+      'Hidden / Speakeasy': '#111827'
+    };
+
     const map = L.map('map');
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
@@ -85,13 +116,12 @@
     const markerLayer = L.layerGroup().addTo(map);
 
     function iconFor(type) {
-      const emoji = typeEmoji[type] || '🍴';
       return L.divIcon({
-        html: `<span aria-hidden="true">${emoji}</span>`,
-        className: 'emoji-marker',
-        iconSize: [36, 36],
-        iconAnchor: [18, 32],
-        popupAnchor: [0, -30]
+        html: `<span class="map-pin" style="--pin-color:${typeColor[type] || '#2563eb'}" aria-hidden="true"></span>`,
+        className: 'map-pin-marker',
+        iconSize: [35, 42],
+        iconAnchor: [17, 39],
+        popupAnchor: [0, -36]
       });
     }
 
