@@ -159,6 +159,12 @@
       return (items || []).map(referenceHtml).join(', ');
     }
 
+    function googleMapsUrl(restaurant) {
+      const location = restaurant.address || `${restaurant.lat},${restaurant.lon}`;
+      const query = encodeURIComponent(`${restaurant.name} @ ${location}`);
+      return `https://www.google.com/maps/search/?api=1&query=${query}`;
+    }
+
     function referenceSearchText(restaurant) {
       return (restaurant.references || []).map(item => item.reference || '').join(' ').toLowerCase();
     }
@@ -196,12 +202,12 @@
 
       visible.forEach(restaurant => {
         const address = restaurant.address || '';
-        const mapQuery = encodeURIComponent(`${restaurant.name}, ${address}`);
+        const mapUrl = googleMapsUrl(restaurant);
         const popup = [
           `<strong>${escapeHtml(restaurant.name)}</strong>`,
           escapeHtml(formattedType(restaurant.type)),
           restaurant.cuisine ? escapeHtml(restaurant.cuisine) : '',
-          address ? `<a href="https://www.google.com/maps/search/${mapQuery}" target="_blank" rel="noopener">${escapeHtml(address)}</a>` : '',
+          `<a href="${mapUrl}" target="_blank" rel="noopener">${escapeHtml(address || 'Open in Google Maps')}</a>`,
           restaurant.phone ? `<a href="tel:${escapeHtml(restaurant.phone)}">${escapeHtml(restaurant.phone)}</a>` : '',
           restaurant.references.length ? `<strong class="reference">Mentions:</strong> ${referencesHtml(restaurant.references)}` : ''
         ].filter(Boolean).join('<br>');
@@ -227,13 +233,13 @@
       </tr></thead><tbody>`;
       visible.forEach((restaurant, index) => {
         const address = restaurant.address || '';
-        const mapQuery = encodeURIComponent(`${restaurant.name}, ${address}`);
+        const mapUrl = googleMapsUrl(restaurant);
         html += `<tr data-id="${escapeHtml(restaurant.id)}">
           <td>${index + 1}</td>
           <td title="${escapeHtml(restaurant.name)}">${escapeHtml(restaurant.name)}</td>
           <td title="${escapeHtml(restaurant.type || 'Unclassified')}">${escapeHtml(formattedType(restaurant.type))}</td>
           <td title="${escapeHtml(restaurant.cuisine || '')}">${escapeHtml(restaurant.cuisine || '')}</td>
-          <td title="${escapeHtml(address)}">${address ? `<a href="https://www.google.com/maps/search/${mapQuery}" target="_blank" rel="noopener">${escapeHtml(address)}</a>` : ''}</td>
+          <td title="${escapeHtml(address || 'Open in Google Maps')}"><a href="${mapUrl}" target="_blank" rel="noopener">${escapeHtml(address || 'Open in Google Maps')}</a></td>
           <td class="phone-column">${restaurant.phone ? `<a href="tel:${escapeHtml(restaurant.phone)}">${escapeHtml(restaurant.phone)}</a>` : ''}</td>
           <td>${referencesHtml(restaurant.references)}</td>
         </tr>`;
