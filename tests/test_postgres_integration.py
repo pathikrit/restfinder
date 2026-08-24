@@ -164,6 +164,79 @@ def test_kmz_import_references_matching_master_without_duplicate():
         ).fetchone() == (master.id, "Rick's List")
 
 
+def test_kmz_import_reuses_existing_external_fallback():
+    now = datetime(2026, 8, 24, tzinfo=timezone.utc)
+    duplicate_permits = [
+        Restaurant(
+            id=f"nyc_dohmh:{identifier}",
+            source="nyc_dohmh",
+            name="Test Place",
+            cuisine="American",
+            address="1 TEST STREET, Manhattan, 10001",
+            phone="2125550100",
+            latitude=latitude,
+            longitude=-73.98,
+            is_chain=False,
+        )
+        for identifier, latitude in ((1, 40.75001), (2, 40.75002))
+    ]
+    upsert_snapshot(
+        duplicate_permits,
+        connection_url=TEST_DATABASE_URL,
+        observed_at=now,
+    )
+    rick_place = KMZPlace(
+        source_id="kmz:ricks-list:test-place",
+        name="Test Place",
+        category="Restaurants",
+        description=None,
+        latitude=40.75,
+        longitude=-73.98,
+        type_hint="Restaurant",
+        restaurant_candidate=True,
+    )
+    import_places(
+        [rick_place],
+        connection_url=TEST_DATABASE_URL,
+        observed_at=now,
+        reference_added_at=now,
+    )
+    megan_place = KMZPlace(
+        source_id="kmz:megans-list:test-place",
+        name="TEST PLACE",
+        category="Drinks",
+        description=None,
+        latitude=40.7501,
+        longitude=-73.98,
+        type_hint="Bars",
+        restaurant_candidate=True,
+    )
+    result = import_places(
+        [megan_place],
+        connection_url=TEST_DATABASE_URL,
+        observed_at=now,
+        reference_added_at=now,
+        source="Megan's List",
+    )
+
+    assert (result.inserted, result.matched_existing) == (0, 1)
+    with psycopg.connect(TEST_DATABASE_URL) as connection:
+        assert connection.execute("SELECT count(*) FROM restaurants").fetchone()[0] == 3
+        assert connection.execute(
+            """
+            SELECT restaurant_id
+            FROM restaurant_references
+            WHERE reference = 'Megan''s List'
+            """
+        ).fetchone() == (rick_place.source_id,)
+        assert connection.execute(
+            "SELECT type FROM restaurants WHERE id = %s", (rick_place.source_id,)
+        ).fetchone() == ("Bars",)
+        assert connection.execute(
+            "SELECT reference FROM restaurant_references ORDER BY reference"
+        ).fetchall() == [("Megan's List",), ("Rick's List",)]
+
+
 def test_new_fallback_import_does_not_expire_older_fallback():
     first = datetime(2026, 8, 24, tzinfo=timezone.utc)
     second = first + timedelta(days=1)

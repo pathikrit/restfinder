@@ -1,0 +1,4 @@
+interface:
+  display_name: "Import KMZ"
+  short_description: "Import a curated Google Maps list"
+  default_prompt: "Import a KMZ into RestFinder as a named list, reviewing folder mappings and canonical matches before writing to Neon."

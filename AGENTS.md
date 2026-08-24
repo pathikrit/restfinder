@@ -16,9 +16,9 @@ operational notes in this file instead.
   `.site/data/nyc.json`.
 - Map category glyphs are official CC0 Maki SVGs under `assets/maki/`; do not
   replace them with emoji or hand-authored pictograms.
-- The UI includes restaurants referenced by Rick's List or by one or more
-  legacy mention URLs, excluding chains, confirmed closures, historical DOHMH
-  rows, and records without coordinates.
+- The UI includes restaurants carrying at least one named-list or URL reference,
+  excluding chains, confirmed closures, historical DOHMH rows, and records
+  without coordinates.
 
 ## Environment
 
@@ -94,23 +94,29 @@ is stored verbatim as a reference URL. Any Atlas Obscura mention sets the
 canonical restaurant type to `Hidden / Speakeasy`. The importer is transactional
 and idempotent.
 
-## Rick's List KMZ
+## KMZ list imports
 
-`data/Rick's List.kmz` is the checked-in source. The importer only accepts the
-Restaurants, Cocktail Bars, and Cafes/Ice Cream/Bakeries folders, and discards
-places more than a nominal two-hour OSRM drive from Times Square. Same-name pins
-within 100 meters are coalesced across folders.
+`src/restfinder/kmz.py` accepts a list name and repeated folder-to-type mappings.
+It discards places more than a nominal two-hour OSRM drive from Times Square and
+coalesces same-name pins within 100 meters across folders. Source snapshots are
+checked in under `data/`; invocations remain explicit one-time operations.
 
 Every KMZ candidate must first attempt a canonical DOHMH match using normalized
-name and nearby coordinates; the KMZ has no address field. Confident matches add
-a `Rick's List` reference to the DOHMH row. Only unmatched or ambiguous places
-create Rick fallback rows. Reruns are idempotent and remove obsolete alias rows.
+or high-confidence similar name plus nearby coordinates; KMZ files generally
+have no address field. Matching prefers DOHMH, then existing external fallback
+rows. Only unresolved places create a source-namespaced fallback. Reruns are
+idempotent and remove obsolete alias rows.
 
-Folder types map as follows:
+Checked-in mappings:
 
-- Restaurants → `Restaurant`
-- Cocktail Bars → `Bars`
-- Cafe/ice cream/bakery entries → `Coffee Shops` or `Dessert` using name keywords
+- `data/Rick's List.kmz`: Restaurants → `Restaurant`; Cocktail Bars → `Bars`;
+  Cafes/Ice Cream/Bakeries → `Coffee Shops` or keyword-derived `Dessert`.
+- `data/Megan's List.kmz`: Drinks → `Bars`; Snacks & Desserts → `Coffee Shops`
+  or keyword-derived `Dessert`; Good Eats and Fancy Eats → `Restaurant`. All
+  other Megan folders are skipped.
+
+The repository-local `/import-kmz` skill under `.agents/skills/import-kmz/`
+documents the review and import workflow for future maps.
 
 ## Deployment
 

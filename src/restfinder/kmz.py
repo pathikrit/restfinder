@@ -6,10 +6,12 @@ import argparse
 from collections import Counter
 from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timezone
+from difflib import SequenceMatcher
 import hashlib
 import json
-from math import atan2, cos, radians, sin, sqrt
+from math import atan2, cos, floor, radians, sin, sqrt
 from pathlib import Path
+import re
 import time
 from typing import Iterable
 import unicodedata
@@ -23,19 +25,35 @@ from restfinder.names import display_name
 
 KML_NAMESPACE = "http://www.opengis.net/kml/2.2"
 NAMESPACES = {"kml": KML_NAMESPACE}
-RESTAURANT_CATEGORIES = {
+DEFAULT_CATEGORY_TYPES = {
     "Restaurants": "Restaurant",
     "Cocktail Bars": "Bars",
     "Cafes, Ice Cream and Bakeries": "Coffee Shops",
 }
-SOURCE = "Rick's List"
-REFERENCE = "Rick's List"
+DEFAULT_SOURCE = "Rick's List"
+RESTAURANT_TYPES = frozenset(
+    {
+        "Restaurant",
+        "Bars",
+        "Coffee Shops",
+        "Dessert",
+        "Fast Food",
+        "Hidden / Speakeasy",
+    }
+)
 TIMES_SQUARE = (40.7580, -73.9855)
 MAX_DRIVING_SECONDS = 2 * 60 * 60
 OSRM_TABLE_URL = "https://router.project-osrm.org/table/v1/driving"
 ROUTE_BATCH_SIZE = 75
 MATCH_DISTANCE_METERS = 100
-TYPE_PRIORITY = {"Restaurant": 1, "Coffee Shops": 2, "Dessert": 3, "Bars": 4}
+TYPE_PRIORITY = {
+    "Restaurant": 1,
+    "Fast Food": 2,
+    "Coffee Shops": 2,
+    "Dessert": 3,
+    "Bars": 4,
+    "Hidden / Speakeasy": 5,
+}
 DESSERT_KEYWORDS = (
     "bakery",
     "bake shop",
@@ -78,6 +96,7 @@ class KMZPlace:
 class KMZDocument:
     name: str
     places: tuple[KMZPlace, ...]
+    source: str = DEFAULT_SOURCE
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,6 +111,8 @@ class ExistingRestaurant:
 class MatchResult:
     matches: dict[str, str]
     ambiguous: int
+    fuzzy: int = 0
+    ambiguous_source_ids: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True, slots=True)
@@ -100,6 +121,7 @@ class ImportResult:
     updated: int
     matched_existing: int
     ambiguous: int
+    fuzzy_matched: int
     duplicates_removed: int
 
 
@@ -127,19 +149,40 @@ def parse_coordinates(raw: str | None, *, place_name: str) -> tuple[float, float
     return latitude, longitude
 
 
-def stable_source_id(category: str, name: str, latitude: float, longitude: float) -> str:
+def source_slug(source: str) -> str:
+    decomposed = unicodedata.normalize("NFKD", source.casefold())
+    ascii_source = decomposed.encode("ascii", "ignore").decode().replace("'", "")
+    slug = re.sub(r"[^a-z0-9]+", "-", ascii_source).strip("-")
+    if not slug:
+        raise ValueError("KMZ source must contain at least one letter or number")
+    return slug
+
+
+def stable_source_id(
+    category: str,
+    name: str,
+    latitude: float,
+    longitude: float,
+    *,
+    source: str = DEFAULT_SOURCE,
+) -> str:
     identity = f"{category}\0{name}\0{latitude:.7f}\0{longitude:.7f}".encode()
     digest = hashlib.sha256(identity).hexdigest()[:20]
-    return f"kmz:ricks-list:{digest}"
+    return f"kmz:{source_slug(source)}:{digest}"
 
 
-def type_for(category: str, name: str) -> str | None:
-    if category == "Cafes, Ice Cream and Bakeries":
+def type_for(
+    category: str,
+    name: str,
+    category_types: dict[str, str] | None = None,
+) -> str | None:
+    category_types = DEFAULT_CATEGORY_TYPES if category_types is None else category_types
+    base_type = category_types.get(category)
+    if base_type == "Coffee Shops":
         normalized_name = name.casefold()
         if any(keyword in normalized_name for keyword in DESSERT_KEYWORDS):
             return "Dessert"
-        return "Coffee Shops"
-    return RESTAURANT_CATEGORIES.get(category)
+    return base_type
 
 
 def kml_member(archive: ZipFile) -> str:
@@ -152,7 +195,13 @@ def kml_member(archive: ZipFile) -> str:
     return candidates[0]
 
 
-def parse_kmz(path: Path) -> KMZDocument:
+def parse_kmz(
+    path: Path,
+    *,
+    source: str = DEFAULT_SOURCE,
+    category_types: dict[str, str] | None = None,
+) -> KMZDocument:
+    category_types = DEFAULT_CATEGORY_TYPES if category_types is None else category_types
     try:
         with ZipFile(path) as archive:
             root = ET.fromstring(archive.read(kml_member(archive)))
@@ -178,18 +227,24 @@ def parse_kmz(path: Path) -> KMZDocument:
             )
             places.append(
                 KMZPlace(
-                    source_id=stable_source_id(category, source_name, latitude, longitude),
+                    source_id=stable_source_id(
+                        category,
+                        source_name,
+                        latitude,
+                        longitude,
+                        source=source,
+                    ),
                     name=name,
                     category=category,
                     description=text(placemark, "kml:description"),
                     latitude=latitude,
                     longitude=longitude,
-                    type_hint=type_for(category, name),
-                    restaurant_candidate=category in RESTAURANT_CATEGORIES,
+                    type_hint=type_for(category, name, category_types),
+                    restaurant_candidate=category in category_types,
                 )
             )
 
-    return KMZDocument(name=document_name, places=tuple(places))
+    return KMZDocument(name=document_name, places=tuple(places), source=source)
 
 
 def unique_restaurant_candidates(document: KMZDocument) -> list[KMZPlace]:
@@ -300,6 +355,24 @@ def normalize_match_name(name: str) -> str:
     )
 
 
+def compact_match_name(name: str) -> str:
+    return normalize_match_name(name).replace(" ", "")
+
+
+def fuzzy_name_score(first: str, second: str) -> float:
+    first_normalized = normalize_match_name(first)
+    second_normalized = normalize_match_name(second)
+    if compact_match_name(first) == compact_match_name(second):
+        return 1.0
+    direct = SequenceMatcher(None, first_normalized, second_normalized).ratio()
+    token_sorted = SequenceMatcher(
+        None,
+        " ".join(sorted(first_normalized.split())),
+        " ".join(sorted(second_normalized.split())),
+    ).ratio()
+    return max(direct, token_sorted)
+
+
 def distance_meters(
     first_latitude: float,
     first_longitude: float,
@@ -323,12 +396,23 @@ def match_existing_restaurants(
     places: Iterable[KMZPlace],
     existing_restaurants: Iterable[ExistingRestaurant],
 ) -> MatchResult:
+    existing_restaurants = list(existing_restaurants)
     by_name: dict[str, list[ExistingRestaurant]] = {}
     for restaurant in existing_restaurants:
         by_name.setdefault(normalize_match_name(restaurant.name), []).append(restaurant)
 
+    cell_size = 0.002
+    by_cell: dict[tuple[int, int], list[ExistingRestaurant]] = {}
+    for restaurant in existing_restaurants:
+        key = (
+            floor(restaurant.latitude / cell_size),
+            floor(restaurant.longitude / cell_size),
+        )
+        by_cell.setdefault(key, []).append(restaurant)
+
     matches: dict[str, str] = {}
-    ambiguous = 0
+    ambiguous_source_ids: set[str] = set()
+    fuzzy = 0
     for place in places:
         nearby = sorted(
             [
@@ -354,8 +438,49 @@ def match_existing_restaurants(
             if next_distance - nearest_distance >= 25:
                 matches[place.source_id] = nearby[0][1].id
             else:
-                ambiguous += 1
-    return MatchResult(matches=matches, ambiguous=ambiguous)
+                ambiguous_source_ids.add(place.source_id)
+        else:
+            cell = (floor(place.latitude / cell_size), floor(place.longitude / cell_size))
+            fuzzy_candidates = []
+            for latitude_offset in (-1, 0, 1):
+                for longitude_offset in (-1, 0, 1):
+                    for restaurant in by_cell.get(
+                        (cell[0] + latitude_offset, cell[1] + longitude_offset),
+                        [],
+                    ):
+                        distance = distance_meters(
+                            place.latitude,
+                            place.longitude,
+                            restaurant.latitude,
+                            restaurant.longitude,
+                        )
+                        if distance > MATCH_DISTANCE_METERS:
+                            continue
+                        score = fuzzy_name_score(place.name, restaurant.name)
+                        if score >= 0.88:
+                            fuzzy_candidates.append((score, distance, restaurant))
+            fuzzy_candidates.sort(
+                key=lambda candidate: (-candidate[0], candidate[1], candidate[2].id)
+            )
+            if len(fuzzy_candidates) == 1:
+                matches[place.source_id] = fuzzy_candidates[0][2].id
+                fuzzy += 1
+            elif len(fuzzy_candidates) > 1:
+                best = fuzzy_candidates[0]
+                second = fuzzy_candidates[1]
+                if best[0] - second[0] >= 0.08 or (
+                    best[0] == second[0] and second[1] - best[1] >= 25
+                ):
+                    matches[place.source_id] = best[2].id
+                    fuzzy += 1
+                else:
+                    ambiguous_source_ids.add(place.source_id)
+    return MatchResult(
+        matches=matches,
+        ambiguous=len(ambiguous_source_ids),
+        fuzzy=fuzzy,
+        ambiguous_source_ids=frozenset(ambiguous_source_ids),
+    )
 
 
 def import_places(
@@ -364,6 +489,8 @@ def import_places(
     connection_url: str,
     observed_at: datetime,
     reference_added_at: datetime,
+    source: str = DEFAULT_SOURCE,
+    reference: str | None = None,
 ) -> ImportResult:
     places = list(places)
     if not places:
@@ -374,24 +501,43 @@ def import_places(
         with connection.cursor() as cursor:
             cursor.execute(
                 """
-                SELECT id, name, latitude, longitude
+                SELECT id, name, latitude, longitude, source
                 FROM restaurants
-                WHERE source = 'nyc_dohmh'
-                  AND latitude IS NOT NULL
+                WHERE latitude IS NOT NULL
                   AND longitude IS NOT NULL
                 """
             )
-            match_result = match_existing_restaurants(
+            existing_rows = cursor.fetchall()
+            master_result = match_existing_restaurants(
                 places,
                 (
-                    ExistingRestaurant(
-                        id=row[0],
-                        name=row[1],
-                        latitude=row[2],
-                        longitude=row[3],
-                    )
-                    for row in cursor.fetchall()
+                    ExistingRestaurant(row[0], row[1], row[2], row[3])
+                    for row in existing_rows
+                    if row[4] == "nyc_dohmh"
                 ),
+            )
+            remaining_places = [
+                place
+                for place in places
+                if place.source_id not in master_result.matches
+            ]
+            fallback_result = match_existing_restaurants(
+                remaining_places,
+                (
+                    ExistingRestaurant(row[0], row[1], row[2], row[3])
+                    for row in existing_rows
+                    if row[4] not in {"nyc_dohmh", source}
+                ),
+            )
+            unresolved_ambiguities = (
+                master_result.ambiguous_source_ids
+                | fallback_result.ambiguous_source_ids
+            ) - fallback_result.matches.keys()
+            match_result = MatchResult(
+                matches={**master_result.matches, **fallback_result.matches},
+                ambiguous=len(unresolved_ambiguities),
+                fuzzy=master_result.fuzzy + fallback_result.fuzzy,
+                ambiguous_source_ids=frozenset(unresolved_ambiguities),
             )
             cursor.execute(
                 """
@@ -457,20 +603,32 @@ def import_places(
                     last_seen = excluded.last_seen,
                     is_chain = excluded.is_chain
                 """,
-                {"source": SOURCE, "observed_at": observed_at},
+                {"source": source, "observed_at": observed_at},
             )
             cursor.execute(
                 """
                 UPDATE restaurants restaurant
                 SET type = matched.type
                 FROM (
-                    SELECT DISTINCT ON (restaurant_id) restaurant_id, type
+                    SELECT DISTINCT ON (restaurant_id)
+                        restaurant_id, type, type_priority
                     FROM incoming_kmz_restaurants
                     WHERE restaurant_id <> source_id
                     ORDER BY restaurant_id, type_priority DESC
                 ) matched
                 WHERE restaurant.id = matched.restaurant_id
-                  AND restaurant.type IS NULL
+                  AND (
+                      restaurant.type IS NULL
+                      OR CASE restaurant.type
+                          WHEN 'Restaurant' THEN 1
+                          WHEN 'Fast Food' THEN 2
+                          WHEN 'Coffee Shops' THEN 2
+                          WHEN 'Dessert' THEN 3
+                          WHEN 'Bars' THEN 4
+                          WHEN 'Hidden / Speakeasy' THEN 5
+                          ELSE 0
+                      END < matched.type_priority
+                  )
                 """
             )
             cursor.execute(
@@ -481,7 +639,7 @@ def import_places(
                 ON CONFLICT (restaurant_id, reference)
                 DO NOTHING
                 """,
-                {"reference": REFERENCE, "added_at": reference_added_at},
+                {"reference": reference or source, "added_at": reference_added_at},
             )
             cursor.execute(
                 """
@@ -491,7 +649,7 @@ def import_places(
                   AND incoming.restaurant_id <> incoming.source_id
                   AND restaurant.source = %s
                 """,
-                (SOURCE,),
+                (source,),
             )
             duplicate_source_ids = [
                 duplicate_source_id
@@ -505,7 +663,7 @@ def import_places(
                     WHERE source = %s
                       AND id = ANY(%s)
                     """,
-                    (SOURCE, duplicate_source_ids),
+                    (source, duplicate_source_ids),
                 )
                 duplicates_removed = cursor.rowcount
             else:
@@ -516,6 +674,7 @@ def import_places(
         updated=existing,
         matched_existing=len(match_result.matches),
         ambiguous=match_result.ambiguous,
+        fuzzy_matched=match_result.fuzzy,
         duplicates_removed=duplicates_removed,
     )
 
@@ -548,6 +707,7 @@ def dry_run_payload(
     )
     return {
         "source_file": str(source_file),
+        "source": document.source,
         "list_name": document.name,
         "total_placemarks": len(document.places),
         "restaurant_candidates": candidate_count,
@@ -569,9 +729,41 @@ def dry_run_payload(
     }
 
 
+def parse_category_types(values: list[str] | None) -> dict[str, str]:
+    if not values:
+        return dict(DEFAULT_CATEGORY_TYPES)
+    category_types: dict[str, str] = {}
+    for value in values:
+        if "=" not in value:
+            raise ValueError(f"Category mapping must use FOLDER=TYPE: {value!r}")
+        category, restaurant_type = (part.strip() for part in value.split("=", 1))
+        if not category:
+            raise ValueError("Category mapping folder cannot be empty")
+        if restaurant_type not in RESTAURANT_TYPES:
+            raise ValueError(
+                f"Unsupported restaurant type {restaurant_type!r}; "
+                f"choose one of {', '.join(sorted(RESTAURANT_TYPES))}"
+            )
+        if category in category_types:
+            raise ValueError(f"Category mapping is duplicated: {category!r}")
+        category_types[category] = restaurant_type
+    return category_types
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("path", type=Path, help="KMZ file to parse")
+    parser.add_argument(
+        "--source",
+        default=DEFAULT_SOURCE,
+        help=f"list/reference name (default: {DEFAULT_SOURCE!r})",
+    )
+    parser.add_argument(
+        "--category",
+        action="append",
+        metavar="FOLDER=TYPE",
+        help="included folder and target type; repeat for each folder",
+    )
     parser.add_argument("--all", action="store_true", help="include non-restaurant folders")
     parser.add_argument("--limit", type=int, help="print at most this many selected placemarks")
     parser.add_argument(
@@ -582,8 +774,13 @@ def main() -> None:
     args = parser.parse_args()
     if args.limit is not None and args.limit < 0:
         parser.error("--limit must be zero or greater")
+    try:
+        category_types = parse_category_types(args.category)
+        source_slug(args.source)
+    except ValueError as error:
+        parser.error(str(error))
 
-    document = parse_kmz(args.path)
+    document = parse_kmz(args.path, source=args.source, category_types=category_types)
     if args.import_db:
         if args.all or args.limit is not None:
             parser.error("--import-db cannot be combined with --all or --limit")
@@ -599,13 +796,14 @@ def main() -> None:
             connection_url=database_url(),
             observed_at=observed_at,
             reference_added_at=reference_added_at,
+            source=args.source,
         )
         accepted_types = Counter(place.type_hint for place in accepted)
         routed = [duration for duration in durations.values() if duration is not None]
         print(
             json.dumps(
                 {
-                    "source": SOURCE,
+                    "source": args.source,
                     "unique_candidates": len(candidates),
                     "within_two_hours": len(accepted),
                     "over_two_hours": sum(
@@ -619,11 +817,12 @@ def main() -> None:
                     "maximum_routed_minutes": round(max(routed) / 60, 1),
                     "types": dict(sorted(accepted_types.items())),
                     "matched_existing": import_result.matched_existing,
+                    "fuzzy_matched": import_result.fuzzy_matched,
                     "ambiguous_matches": import_result.ambiguous,
                     "duplicates_removed": import_result.duplicates_removed,
                     "inserted": import_result.inserted,
                     "updated": import_result.updated,
-                    "reference": REFERENCE,
+                    "reference": args.source,
                 },
                 indent=2,
             )

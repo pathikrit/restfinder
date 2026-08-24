@@ -9,7 +9,9 @@ from restfinder.kmz import (
     ExistingRestaurant,
     driving_durations,
     dry_run_payload,
+    fuzzy_name_score,
     parse_coordinates,
+    parse_category_types,
     parse_kmz,
     match_existing_restaurants,
     type_for,
@@ -88,12 +90,39 @@ def test_source_id_is_stable(tmp_path):
     assert first == second
 
 
+def test_source_id_namespace_changes_with_list_name(tmp_path):
+    path = tmp_path / "list.kmz"
+    write_kmz(path)
+    document = parse_kmz(
+        path,
+        source="Megan's List",
+        category_types={"Restaurants": "Restaurant"},
+    )
+    assert document.source == "Megan's List"
+    assert document.places[0].source_id.startswith("kmz:megans-list:")
+
+
 def test_category_type_mapping():
     assert type_for("Restaurants", "Any Place") == "Restaurant"
     assert type_for("Cocktail Bars", "Any Place") == "Bars"
     assert type_for("Cafes, Ice Cream and Bakeries", "Devoción") == "Coffee Shops"
     assert type_for("Cafes, Ice Cream and Bakeries", "Van Leeuwen Ice Cream") == "Dessert"
     assert type_for("Museums, Galleries & Landmarks", "Any Place") is None
+
+
+def test_custom_category_mapping_and_dessert_classification():
+    mapping = parse_category_types(
+        [
+            "Drinks=Bars",
+            "Snacks & Desserts=Coffee Shops",
+            "Good Eats=Restaurant",
+            "Fancy Eats=Restaurant",
+        ]
+    )
+    assert type_for("Drinks", "Any Place", mapping) == "Bars"
+    assert type_for("Snacks & Desserts", "Devoción", mapping) == "Coffee Shops"
+    assert type_for("Snacks & Desserts", "Morgenstern's Ice Cream", mapping) == "Dessert"
+    assert type_for("Cheap Eats + Quick Bites", "Any Place", mapping) is None
 
 
 class RouteResponse:
@@ -155,6 +184,39 @@ def test_matching_leaves_close_duplicate_permits_ambiguous():
     result = match_existing_restaurants([place], existing)
     assert result.matches == {}
     assert result.ambiguous == 1
+    assert result.ambiguous_source_ids == frozenset({"kmz:one"})
+
+
+def test_matching_accepts_high_confidence_name_variant_nearby():
+    place = KMZPlace(
+        "kmz:one",
+        "Peter Luger Steak House",
+        "Good Eats",
+        None,
+        40.7099,
+        -73.9625,
+        "Restaurant",
+        True,
+    )
+    existing = ExistingRestaurant(
+        "nyc_dohmh:1",
+        "PETER LUGER STEAKHOUSE",
+        40.7100,
+        -73.9625,
+    )
+    result = match_existing_restaurants([place], [existing])
+    assert result.matches == {"kmz:one": "nyc_dohmh:1"}
+    assert result.fuzzy == 1
+
+
+def test_matching_rejects_nearby_unrelated_name():
+    place = KMZPlace(
+        "kmz:one", "Emily", "Good Eats", None, 40.73, -74.0, "Restaurant", True
+    )
+    existing = ExistingRestaurant("nyc_dohmh:1", "Aria", 40.7301, -74.0)
+    result = match_existing_restaurants([place], [existing])
+    assert result.matches == {}
+    assert fuzzy_name_score(place.name, existing.name) < 0.88
 
 
 def test_candidates_coalesce_same_name_and_nearby_location_across_folders():
