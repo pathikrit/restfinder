@@ -1,4 +1,4 @@
-.PHONY: migrate fetch import import-all kmz-dry-run export site build dev test clean
+.PHONY: migrate fetch import import-all kmz-dry-run kmz-import export site build dev test clean
 
 PYTHON := PYTHONPATH=src uv run python
 
@@ -18,6 +18,10 @@ import-all: migrate
 kmz-dry-run:
 	@test -n "$(FILE)" || { echo "Usage: make kmz-dry-run FILE=\"data/Rick's List.kmz\" [LIMIT=25]"; exit 1; }
 	$(PYTHON) -m restfinder.kmz "$(FILE)" $(if $(LIMIT),--limit $(LIMIT),)
+
+kmz-import: migrate
+	@test -n "$(FILE)" || { echo "Usage: make kmz-import FILE=\"data/Rick's List.kmz\""; exit 1; }
+	$(PYTHON) -m restfinder.kmz "$(FILE)" --import-db
 
 export: migrate
 	$(PYTHON) -m restfinder.export

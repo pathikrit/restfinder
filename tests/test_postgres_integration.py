@@ -5,6 +5,7 @@ import psycopg
 import pytest
 
 from restfinder.export import export_rows
+from restfinder.kmz import KMZPlace, import_places
 from restfinder.nyc import Restaurant, upsert_snapshot
 from restfinder.references import ReferenceManifest, import_manifests
 
@@ -90,3 +91,117 @@ def test_unknown_reference_id_rolls_back_entire_import():
         import_manifests([manifest], connection_url=TEST_DATABASE_URL)
     with psycopg.connect(TEST_DATABASE_URL) as connection:
         assert connection.execute("SELECT count(*) FROM restaurant_references").fetchone()[0] == 0
+
+
+def test_kmz_import_sets_source_type_and_reference():
+    now = datetime(2026, 8, 24, tzinfo=timezone.utc)
+    place = KMZPlace(
+        source_id="kmz:ricks-list:test",
+        name="Test Cafe",
+        category="Cafes, Ice Cream and Bakeries",
+        description=None,
+        latitude=40.75,
+        longitude=-73.98,
+        type_hint="Coffee Shops",
+        restaurant_candidate=True,
+    )
+    result = import_places(
+        [place],
+        connection_url=TEST_DATABASE_URL,
+        observed_at=now,
+        reference_added_at=now,
+    )
+    assert (result.inserted, result.updated, result.matched_existing) == (1, 0, 0)
+
+    with psycopg.connect(TEST_DATABASE_URL) as connection:
+        assert connection.execute(
+            "SELECT source, type FROM restaurants WHERE id = %s", (place.source_id,)
+        ).fetchone() == ("Rick's List", "Coffee Shops")
+        assert connection.execute(
+            "SELECT reference FROM restaurant_references WHERE restaurant_id = %s",
+            (place.source_id,),
+        ).fetchone() == ("Rick's List",)
+
+
+def test_kmz_import_references_matching_master_without_duplicate():
+    now = datetime(2026, 8, 24, tzinfo=timezone.utc)
+    master = Restaurant(
+        id="nyc_dohmh:123",
+        source="nyc_dohmh",
+        name="Café China",
+        cuisine="Chinese",
+        address="59 W 37TH ST, Manhattan, NY 10018",
+        phone="2122132810",
+        latitude=40.7501,
+        longitude=-73.9821,
+        is_chain=False,
+    )
+    upsert_snapshot([master], connection_url=TEST_DATABASE_URL, observed_at=now)
+    place = KMZPlace(
+        source_id="kmz:ricks-list:cafe-china",
+        name="CAFE CHINA",
+        category="Restaurants",
+        description=None,
+        latitude=40.7500,
+        longitude=-73.9821,
+        type_hint="Restaurant",
+        restaurant_candidate=True,
+    )
+
+    result = import_places(
+        [place],
+        connection_url=TEST_DATABASE_URL,
+        observed_at=now,
+        reference_added_at=now,
+    )
+
+    assert (result.inserted, result.matched_existing, result.ambiguous) == (0, 1, 0)
+    with psycopg.connect(TEST_DATABASE_URL) as connection:
+        assert connection.execute("SELECT count(*) FROM restaurants").fetchone()[0] == 1
+        assert connection.execute(
+            "SELECT restaurant_id, reference FROM restaurant_references"
+        ).fetchone() == (master.id, "Rick's List")
+
+
+def test_new_fallback_import_does_not_expire_older_fallback():
+    first = datetime(2026, 8, 24, tzinfo=timezone.utc)
+    second = first + timedelta(days=1)
+    places = [
+        KMZPlace(
+            source_id="kmz:ricks-list:first",
+            name="First Place",
+            category="Restaurants",
+            description=None,
+            latitude=40.70,
+            longitude=-73.90,
+            type_hint="Restaurant",
+            restaurant_candidate=True,
+        ),
+        KMZPlace(
+            source_id="kmz:ricks-list:second",
+            name="Second Place",
+            category="Cocktail Bars",
+            description=None,
+            latitude=40.71,
+            longitude=-73.91,
+            type_hint="Bars",
+            restaurant_candidate=True,
+        ),
+    ]
+    import_places(
+        places[:1],
+        connection_url=TEST_DATABASE_URL,
+        observed_at=first,
+        reference_added_at=first,
+    )
+    import_places(
+        places[1:],
+        connection_url=TEST_DATABASE_URL,
+        observed_at=second,
+        reference_added_at=second,
+    )
+
+    assert [row["id"] for row in export_rows(connection_url=TEST_DATABASE_URL)] == [
+        "kmz:ricks-list:first",
+        "kmz:ricks-list:second",
+    ]

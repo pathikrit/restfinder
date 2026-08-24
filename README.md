@@ -12,13 +12,15 @@ Requires Python 3.13.2 and [uv](https://docs.astral.sh/uv/).
 ```bash
 uv sync --locked
 cp .env.sample .env
-# Set DATABASE_URL in .env to the Neon connection string.
+# Set the Neon user, password, host, and database values in .env.
 make fetch
 make dev
 ```
 
 `python-dotenv` loads `.env` locally without overriding environment variables.
-The `.env` file and generated `.site/` directory are gitignored.
+The local URL interpolates `DATABASE_USER` and `DATABASE_PASSWORD`; CI may still
+provide a complete `DATABASE_URL` secret directly. The `.env` file and generated
+`.site/` directory are gitignored.
 
 ## Commands
 
@@ -28,6 +30,7 @@ make fetch                            # fetch and upsert the current NYC snapsho
 make import FILE=imports/example.json # apply one reference manifest
 make import-all                       # apply every imports/*.json manifest
 make kmz-dry-run FILE="data/Rick's List.kmz" LIMIT=25 # parse without database writes
+make kmz-import FILE="data/Rick's List.kmz" # route-filter and import into Postgres
 make export                           # write .site/data/nyc.json from Neon
 make build                            # export data and assemble the static site
 make dev                              # build and serve http://localhost:8080
@@ -76,16 +79,29 @@ make kmz-dry-run FILE="data/Rick's List.kmz" LIMIT=25
 The parser reads every KML placemark without extracting the archive. Its default
 output contains restaurant candidates from the `Restaurants`, `Cocktail Bars`,
 and `Cafes, Ice Cream and Bakeries` folders, along with counts for the skipped
-non-food folders. `Restaurants` and `Cocktail Bars` receive type hints;
-cafe/bakery entries remain unclassified because the source folder does not
-distinguish coffee shops from desserts. The dry-run command never reads `.env`
-or connects to Postgres.
+non-food folders. All candidates receive type hints; cafe/bakery entries use
+explicit dessert keywords and otherwise default to `Coffee Shops`. The dry-run
+command never reads `.env` or connects to Postgres.
+
+`make kmz-import` coalesces same-name pins within 100 meters (including aliases
+across folders), queries OSRM for nominal driving times from Times Square in
+throttled batches, and imports only places at or below two hours. It ignores
+every non-food folder. Each place is first matched to the DOHMH master list by
+normalized name and nearby coordinates (the KMZ has no street-address field). A
+confident match adds a `Rick's List` reference to the existing DOHMH restaurant.
+Only unmatched or ambiguous places create fallback restaurant rows whose source
+is `Rick's List`; ambiguous candidates are never forced onto an arbitrary
+permit. Restaurants map to `Restaurant`, cocktail bars map to `Bars`, and the
+cafe/ice-cream/bakery folder maps to `Coffee Shops` or `Dessert` using explicit
+name keywords. Re-running the command is idempotent and removes obsolete source
+aliases left by older imports.
 
 ## Static export
 
-The frontend export contains restaurants that were seen in the latest complete
-DOHMH snapshot, have at least one reference, are not chains or confirmed closed,
-and have map coordinates. It is deterministically ordered by restaurant ID.
+The frontend export contains current DOHMH restaurants plus persistent fallback
+restaurants created by ad hoc importers. Every exported row has at least one
+reference, is not a chain or confirmed closed, and has map coordinates. It is
+deterministically ordered by restaurant ID.
 
 ## GitHub Actions
 

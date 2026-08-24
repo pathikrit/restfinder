@@ -13,7 +13,6 @@ import psycopg
 from psycopg.rows import dict_row
 
 from restfinder.config import database_url
-from restfinder.nyc import SOURCE
 
 OUTPUT_PATH = Path(".site/data/nyc.json")
 
@@ -25,10 +24,6 @@ def isoformat(value: datetime) -> str:
 def export_rows(*, connection_url: str) -> list[dict[str, Any]]:
     with psycopg.connect(connection_url, row_factory=dict_row) as connection:
         with connection.cursor() as cursor:
-            cursor.execute("SELECT max(last_seen) AS latest FROM restaurants WHERE source = %s", (SOURCE,))
-            latest = cursor.fetchone()["latest"]
-            if latest is None:
-                return []
             cursor.execute(
                 """
                 SELECT
@@ -44,8 +39,14 @@ def export_rows(*, connection_url: str) -> list[dict[str, Any]]:
                     restaurant.first_seen,
                     restaurant.last_seen
                 FROM restaurants restaurant
-                WHERE restaurant.source = %(source)s
-                  AND restaurant.last_seen = %(latest)s
+                WHERE (
+                    restaurant.source <> 'nyc_dohmh'
+                    OR restaurant.last_seen = (
+                        SELECT max(current.last_seen)
+                        FROM restaurants current
+                        WHERE current.source = restaurant.source
+                    )
+                )
                   AND NOT restaurant.is_chain
                   AND restaurant.is_permanently_closed IS DISTINCT FROM true
                   AND restaurant.latitude IS NOT NULL
@@ -56,7 +57,6 @@ def export_rows(*, connection_url: str) -> list[dict[str, Any]]:
                   )
                 ORDER BY restaurant.id
                 """,
-                {"source": SOURCE, "latest": latest},
             )
             rows = cursor.fetchall()
             if not rows:
