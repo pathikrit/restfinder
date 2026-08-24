@@ -14,7 +14,7 @@ _export: _migrate
 
 build: _export
 	@mkdir -p .site
-	cp -f cities.json index.html .site/
+	cp -f cities.json index.html manifest.webmanifest service-worker.js .site/
 	@mkdir -p .site/assets
 	cp -R assets/. .site/assets/
 

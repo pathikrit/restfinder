@@ -1,5 +1,7 @@
 # Rick's Restaurant Finder
 
+[![Test and deploy](https://github.com/pathikrit/restfinder/actions/workflows/deploy.yml/badge.svg)](https://github.com/pathikrit/restfinder/actions/workflows/deploy.yml)
+
 A curated map of NYC restaurants recommended by Rick's List, Michelin, James
 Beard, Atlas Obscura, Itsfound, and The Infatuation. NYC DOHMH is the canonical
 restaurant source, Neon stores restaurants and their references, and GitHub

@@ -15,8 +15,8 @@ class DevelopmentHandler(SimpleHTTPRequestHandler):
         request_path = urlsplit(path).path
         if request_path in {"/", "/index.html"}:
             return str(self.source_root / "index.html")
-        if request_path == "/cities.json":
-            return str(self.source_root / "cities.json")
+        if request_path in {"/cities.json", "/manifest.webmanifest", "/service-worker.js"}:
+            return str(self.source_root / request_path.lstrip("/"))
         if request_path.startswith("/assets/"):
             assets_root = (self.source_root / "assets").resolve()
             candidate = (self.source_root / request_path.lstrip("/")).resolve()

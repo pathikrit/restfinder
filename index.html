@@ -2,8 +2,15 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#111827">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="RestFinder">
   <title>Rick's Restaurant Finder</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="assets/icons/app-icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css">
   <style>
@@ -20,8 +27,8 @@
     }
     * { box-sizing: border-box; }
     html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-    body { display: grid; grid-template-rows: auto minmax(260px, 55vh) 1fr; overflow: hidden; }
-    header { position: relative; z-index: 1001; display: grid; grid-template-columns: minmax(max-content, 1fr) minmax(280px, 600px) minmax(max-content, 1fr); align-items: center; gap: 18px; min-height: 48px; padding: 8px 16px; border-bottom: 1px solid var(--line); background: var(--panel); }
+    body { display: grid; min-height: 100dvh; grid-template-rows: auto minmax(260px, 55dvh) 1fr; overflow: hidden; }
+    header { position: relative; z-index: 1001; display: grid; grid-template-columns: minmax(max-content, 1fr) minmax(280px, 600px) minmax(max-content, 1fr); align-items: center; gap: 18px; min-height: 48px; padding: max(8px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 8px max(16px, env(safe-area-inset-left)); border-bottom: 1px solid var(--line); background: var(--panel); }
     h1 { margin: 0; font-size: 16px; letter-spacing: .01em; }
     .status { color: var(--muted); font-size: 12px; text-align: right; }
     .status a { color: var(--muted); text-underline-offset: 2px; }
@@ -42,7 +49,7 @@
     }
     .address-search input::placeholder { color: var(--muted); }
     .address-search input:focus { border-color: var(--blue); box-shadow: 0 0 0 2px rgba(96,165,250,.12); }
-    .address-search button[type="submit"] {
+    .locate-button {
       position: absolute;
       right: 4px;
       display: grid;
@@ -56,7 +63,8 @@
       color: var(--blue);
       cursor: pointer;
     }
-    .address-search button[type="submit"]:hover, .address-search button[type="submit"]:focus-visible { background: rgba(96,165,250,.14); outline: none; }
+    .locate-button:hover, .locate-button:focus-visible { background: rgba(96,165,250,.14); outline: none; }
+    .locate-button:disabled { color: var(--muted); cursor: wait; }
     .address-results {
       position: absolute;
       top: calc(100% + 5px);
@@ -95,7 +103,7 @@
     .search-credit a { color: var(--muted); }
     .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
     #map { width: 100%; height: 100%; }
-    #table-wrap { overflow: auto; border-top: 1px solid var(--line); }
+    #table-wrap { overflow: auto; overscroll-behavior: contain; border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); }
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
     thead { position: sticky; top: 0; z-index: 2; background: var(--panel); }
     th { padding: 8px 10px; border-bottom: 2px solid var(--line); color: var(--muted); text-align: left; vertical-align: top; }
@@ -165,12 +173,28 @@
     .metadata-value { min-width: 0; padding-top: 1px; }
     .metadata-value a { overflow-wrap: anywhere; }
     @media (max-width: 700px) {
-      body { grid-template-rows: auto minmax(230px, 48vh) 1fr; }
-      header { grid-template-columns: minmax(0, 1fr) max-content; gap: 7px 10px; padding: 8px 10px; }
+      body { grid-template-rows: auto minmax(220px, 42dvh) minmax(0, 1fr); }
+      header { grid-template-columns: minmax(0, 1fr) max-content; gap: 7px 10px; padding: max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) 8px max(10px, env(safe-area-inset-left)); }
       h1 { font-size: 14px; }
       .status { font-size: 10px; }
       .address-search { grid-column: 1 / -1; grid-row: 2; }
-      th, td { padding: 7px; }
+      .address-search input, .filter input { font-size: 16px; }
+      .address-search input { height: 42px; padding-right: 48px; }
+      .locate-button { width: 36px; height: 34px; font-size: 14px; }
+      .leaflet-touch .leaflet-bar a { width: 38px; height: 38px; line-height: 38px; }
+      table, thead, tbody { display: block; width: 100%; }
+      thead tr { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; padding: 8px 10px; }
+      th { width: auto !important; padding: 0; border: 0; }
+      th:first-child { display: none; }
+      th:nth-child(4) { grid-column: 1 / -1; }
+      tbody tr { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 3px 8px; padding: 10px; border-bottom: 1px solid #1e293b; }
+      td { width: auto !important; max-width: none; padding: 0; overflow: visible; border: 0; white-space: normal; }
+      td:first-child { grid-row: 1 / 4; color: var(--muted); font-size: 11px; }
+      td:nth-child(2) { font-size: 15px; }
+      td:nth-child(3) { color: var(--muted); font-size: 12px; }
+      td:nth-child(3)::before { content: "Type · "; }
+      td:nth-child(4) { font-size: 13px; }
+      .map-link { width: 36px; height: 36px; margin-top: -7px; margin-bottom: -7px; font-size: 12px; }
     }
   </style>
 </head>
@@ -182,7 +206,7 @@
       <div class="address-search-control">
         <i class="fa-solid fa-magnifying-glass address-search-icon" aria-hidden="true"></i>
         <input id="address-query" type="search" inputmode="search" placeholder="Search an NYC metro address…" aria-autocomplete="list" aria-controls="address-results" aria-expanded="false">
-        <button type="submit" aria-label="Zoom to address" title="Zoom to address"><i class="fa-solid fa-location-crosshairs" aria-hidden="true"></i></button>
+        <button id="locate-me" class="locate-button" type="button" aria-label="Use my current location" title="Use my current location"><i class="fa-solid fa-location-crosshairs" aria-hidden="true"></i></button>
       </div>
       <ul id="address-results" class="address-results" role="listbox" hidden></ul>
       <span id="address-search-status" class="sr-only" aria-live="polite"></span>
@@ -235,6 +259,7 @@
     const addressInput = document.getElementById('address-query');
     const addressResultsList = document.getElementById('address-results');
     const addressSearchStatus = document.getElementById('address-search-status');
+    const locateButton = document.getElementById('locate-me');
     const metroBounds = '-74.50,40.40,-73.20,41.20';
 
     function addressLabel(feature) {
@@ -327,6 +352,57 @@
       addressSearchStatus.textContent = `Map centered on ${label}.`;
     }
 
+    function finishLocationRequest() {
+      locateButton.disabled = false;
+      locateButton.querySelector('i').className = 'fa-solid fa-location-crosshairs';
+    }
+
+    locateButton.addEventListener('click', () => {
+      if (!navigator.geolocation) {
+        addressSearchStatus.textContent = 'Location services are not supported by this browser.';
+        return;
+      }
+      locateButton.disabled = true;
+      locateButton.querySelector('i').className = 'fa-solid fa-spinner fa-spin';
+      addressSearchStatus.textContent = 'Finding your current location…';
+      navigator.geolocation.getCurrentPosition(position => {
+        const { latitude, longitude, accuracy } = position.coords;
+        addressInput.value = 'Current location';
+        hideAddressResults();
+        addressLayer.clearLayers();
+        L.circle([latitude, longitude], {
+          radius: accuracy,
+          color: '#60a5fa',
+          weight: 1,
+          fillColor: '#60a5fa',
+          fillOpacity: .1,
+          interactive: false
+        }).addTo(addressLayer);
+        L.circleMarker([latitude, longitude], {
+          radius: 8,
+          color: '#e5e7eb',
+          weight: 3,
+          fillColor: '#3b82f6',
+          fillOpacity: 1
+        }).bindTooltip('Your current location', { direction: 'top' }).addTo(addressLayer);
+        map.flyTo([latitude, longitude], 16, { duration: .7 });
+        addressSearchStatus.textContent = 'Map centered on your current location.';
+        finishLocationRequest();
+      }, error => {
+        const messages = {
+          1: 'Location permission was denied.',
+          2: 'Your current location is unavailable.',
+          3: 'Finding your location timed out.'
+        };
+        addressSearchStatus.textContent = messages[error.code] || 'Could not determine your current location.';
+        finishLocationRequest();
+      }, {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 60000
+      });
+    });
+
     addressInput.addEventListener('input', () => {
       clearTimeout(addressSearchTimer);
       const query = addressInput.value.trim();
@@ -340,6 +416,11 @@
     });
 
     addressInput.addEventListener('keydown', event => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        addressForm.requestSubmit();
+        return;
+      }
       if (event.key === 'Escape') {
         hideAddressResults();
         return;
@@ -562,6 +643,12 @@
       document.getElementById('table-wrap').innerHTML = '<div class="empty">Restaurant data could not be loaded.</div>';
       map.setView([40.758, -73.9855], 14);
     });
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('service-worker.js').catch(error => {
+        console.error('Service worker registration failed', error);
+      }));
+    }
   </script>
 </body>
 </html>
