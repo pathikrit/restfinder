@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Rick's Restaurant Finder</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css">
   <style>
     :root {
       color-scheme: dark;
@@ -23,18 +24,34 @@
     header { display: flex; align-items: center; gap: 18px; min-height: 48px; padding: 8px 16px; border-bottom: 1px solid var(--line); background: var(--panel); }
     h1 { margin: 0; font-size: 16px; letter-spacing: .01em; }
     .status { margin-left: auto; color: var(--muted); font-size: 12px; text-align: right; }
-    .github { color: var(--muted); text-decoration: none; font-weight: 700; }
-    .github:hover { color: var(--text); }
+    .status a { color: var(--muted); text-underline-offset: 2px; }
+    .status a:hover { color: var(--text); }
     #map { width: 100%; height: 100%; }
     #table-wrap { overflow: auto; border-top: 1px solid var(--line); }
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
     thead { position: sticky; top: 0; z-index: 2; background: var(--panel); }
     th { padding: 8px 10px; border-bottom: 2px solid var(--line); color: var(--muted); text-align: left; vertical-align: top; }
-    td { max-width: 280px; padding: 8px 10px; border-bottom: 1px solid #1e293b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    th:first-child, td:first-child { width: 44px; }
+    th:nth-child(2), td:nth-child(2) { width: 34%; }
+    td { max-width: 480px; padding: 8px 10px; border-bottom: 1px solid #1e293b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     tbody tr { cursor: pointer; }
     tbody tr:hover, tbody tr.selected { background: var(--panel-soft); }
     a { color: var(--blue); }
     .reference { color: var(--accent); }
+    .restaurant-name { color: var(--text); font-weight: 600; }
+    .map-link {
+      display: inline-grid;
+      width: 22px;
+      height: 22px;
+      margin-left: 5px;
+      place-items: center;
+      border-radius: 5px;
+      color: var(--blue);
+      font-size: 10px;
+      text-decoration: none;
+      vertical-align: -1px;
+    }
+    .map-link:hover, .map-link:focus-visible { background: rgba(96,165,250,.14); color: #93c5fd; outline: none; }
     .filter { position: relative; margin-top: 5px; }
     .filter input { width: 100%; min-width: 90px; padding: 5px 7px; border: 1px solid var(--line); border-radius: 5px; outline: none; background: var(--bg); color: var(--text); font: inherit; font-size: 11px; }
     .filter input:focus { border-color: var(--blue); }
@@ -62,13 +79,29 @@
       transform: rotate(45deg);
       filter: brightness(0) invert(1);
     }
+    .popup-heading { display: flex; align-items: center; margin-bottom: 8px; font-size: 14px; }
+    .popup-heading .map-link { color: #2563eb; }
+    .popup-metadata { display: grid; gap: 7px; }
+    .metadata-row { display: grid; grid-template-columns: 20px minmax(0, 1fr); align-items: start; gap: 7px; }
+    .metadata-icon {
+      display: grid;
+      width: 20px;
+      height: 20px;
+      place-items: center;
+      border-radius: 50%;
+      background: #dbeafe;
+      color: #2563eb;
+      font-size: 10px;
+    }
+    .metadata-row:nth-child(even) .metadata-icon { background: #fef3c7; color: #d97706; }
+    .metadata-value { min-width: 0; padding-top: 1px; }
+    .metadata-value a { overflow-wrap: anywhere; }
     @media (max-width: 700px) {
       body { grid-template-rows: auto minmax(230px, 48vh) 1fr; }
       header { gap: 8px; padding: 8px 10px; }
       h1 { font-size: 14px; }
       .status { font-size: 10px; }
       th, td { padding: 7px; }
-      .phone-column { display: none; }
     }
   </style>
 </head>
@@ -76,14 +109,13 @@
   <header>
     <h1>Rick's Restaurant Finder</h1>
     <span id="status" class="status">Loading…</span>
-    <a class="github" href="https://github.com/pathikrit/restfinder" target="_blank" rel="noopener" aria-label="GitHub repository">GitHub</a>
   </header>
   <main id="map" aria-label="Restaurant map"></main>
   <section id="table-wrap" aria-live="polite"><div class="empty">Loading restaurants…</div></section>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <script>
-    const filters = { name: '', type: '', cuisine: '', address: '', references: '' };
+    const filters = { name: '', type: '', references: '' };
     const markers = new Map();
     let restaurants = [];
 
@@ -106,9 +138,10 @@
     };
 
     const map = L.map('map');
+    map.attributionControl.setPrefix('<a href="https://leafletjs.com" target="_blank" rel="noopener">Leaflet</a>');
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'
     }).addTo(map);
     const markerLayer = L.layerGroup().addTo(map);
 
@@ -171,8 +204,6 @@
         bounds.contains([restaurant.lat, restaurant.lon]) &&
         (!filters.name || (restaurant.name || '').toLowerCase().includes(filters.name)) &&
         (!filters.type || (restaurant.type || 'unclassified').toLowerCase().includes(filters.type)) &&
-        (!filters.cuisine || (restaurant.cuisine || '').toLowerCase().includes(filters.cuisine)) &&
-        (!filters.address || (restaurant.address || '').toLowerCase().includes(filters.address)) &&
         (!filters.references || referenceSearchText(restaurant).includes(filters.references))
       );
     }
@@ -198,14 +229,25 @@
       visible.forEach(restaurant => {
         const address = restaurant.address || '';
         const mapUrl = googleMapsUrl(restaurant);
-        const popup = [
-          `<strong>${escapeHtml(restaurant.name)}</strong>`,
-          escapeHtml(restaurant.type || 'Unclassified'),
-          restaurant.cuisine ? escapeHtml(restaurant.cuisine) : '',
-          `<a href="${mapUrl}" target="_blank" rel="noopener">${escapeHtml(address || 'Open in Google Maps')}</a>`,
-          restaurant.phone ? `<a href="tel:${escapeHtml(restaurant.phone)}">${escapeHtml(restaurant.phone)}</a>` : '',
-          restaurant.references.length ? `<strong class="reference">Mentions:</strong> ${referencesHtml(restaurant.references)}` : ''
-        ].filter(Boolean).join('<br>');
+        const metadata = [
+          ['fa-utensils', escapeHtml(restaurant.type || 'Unclassified')],
+          restaurant.cuisine ? ['fa-bowl-food', escapeHtml(restaurant.cuisine)] : null,
+          ['fa-location-dot', escapeHtml(address || `${restaurant.lat}, ${restaurant.lon}`)],
+          restaurant.phone ? ['fa-phone', `<a href="tel:${escapeHtml(restaurant.phone)}">${escapeHtml(restaurant.phone)}</a>`] : null,
+          restaurant.references.length ? ['fa-bookmark', referencesHtml(restaurant.references)] : null
+        ].filter(Boolean).map(([icon, value]) => `
+          <div class="metadata-row">
+            <span class="metadata-icon" aria-hidden="true"><i class="fa-solid ${icon}"></i></span>
+            <span class="metadata-value">${value}</span>
+          </div>`).join('');
+        const popup = `
+          <div class="popup-heading">
+            <strong>${escapeHtml(restaurant.name)}</strong>
+            <a class="map-link" href="${mapUrl}" target="_blank" rel="noopener" aria-label="Open ${escapeHtml(restaurant.name)} in Google Maps" title="Open in Google Maps">
+              <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
+            </a>
+          </div>
+          <div class="popup-metadata">${metadata}</div>`;
         const markerType = restaurant.type || 'Unclassified';
         const marker = L.marker([restaurant.lat, restaurant.lon], {
           icon: iconFor(restaurant.type),
@@ -227,21 +269,19 @@
         <th>#</th>
         <th>Name${filterInput('name')}</th>
         <th>Type${filterInput('type')}</th>
-        <th>Cuisine${filterInput('cuisine')}</th>
-        <th>Address${filterInput('address')}</th>
-        <th class="phone-column">Phone</th>
         <th>Mentions${filterInput('references')}</th>
       </tr></thead><tbody>`;
       visible.forEach((restaurant, index) => {
-        const address = restaurant.address || '';
         const mapUrl = googleMapsUrl(restaurant);
         html += `<tr data-id="${escapeHtml(restaurant.id)}">
           <td>${index + 1}</td>
-          <td title="${escapeHtml(restaurant.name)}">${escapeHtml(restaurant.name)}</td>
+          <td title="${escapeHtml(restaurant.name)}">
+            <span class="restaurant-name">${escapeHtml(restaurant.name)}</span>
+            <a class="map-link" href="${mapUrl}" target="_blank" rel="noopener" aria-label="Open ${escapeHtml(restaurant.name)} in Google Maps" title="Open in Google Maps">
+              <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
+            </a>
+          </td>
           <td title="${escapeHtml(restaurant.type || 'Unclassified')}">${escapeHtml(restaurant.type || 'Unclassified')}</td>
-          <td title="${escapeHtml(restaurant.cuisine || '')}">${escapeHtml(restaurant.cuisine || '')}</td>
-          <td title="${escapeHtml(address || 'Open in Google Maps')}"><a href="${mapUrl}" target="_blank" rel="noopener">${escapeHtml(address || 'Open in Google Maps')}</a></td>
-          <td class="phone-column">${restaurant.phone ? `<a href="tel:${escapeHtml(restaurant.phone)}">${escapeHtml(restaurant.phone)}</a>` : ''}</td>
           <td>${referencesHtml(restaurant.references)}</td>
         </tr>`;
       });
@@ -274,7 +314,13 @@
       map.setView([city.lat, city.lng], city.zoom);
       restaurants = data;
       const latest = restaurants.reduce((value, item) => value > item.last_seen ? value : item.last_seen, '');
-      document.getElementById('status').textContent = `${restaurants.length} curated places${latest ? ` · Updated ${new Date(latest).toLocaleDateString()}` : ''}`;
+      const updated = latest ? new Date(latest).toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: '2-digit',
+        timeZone: 'UTC'
+      }).replace(/ /g, '-') : '';
+      document.getElementById('status').innerHTML = `${restaurants.length} places${updated ? ` · Updated <a href="https://github.com/pathikrit/restfinder/commit/main" target="_blank" rel="noopener" title="View deployed commit">${updated}</a>` : ''}`;
       render();
       map.on('moveend', render);
     }).catch(error => {
