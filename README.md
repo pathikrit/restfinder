@@ -28,7 +28,8 @@ provide a complete `DATABASE_URL` secret directly. The `.env` file and generated
 make migrate                          # apply schema migrations
 make fetch                            # fetch and upsert the current NYC snapshot
 make import FILE=imports/example.json # apply one reference manifest
-make import-all                       # apply every imports/*.json manifest
+make import-all                       # apply manifests and the legacy snapshot
+make legacy-import                    # replay legacy mention URLs into Postgres
 make kmz-dry-run FILE="data/Rick's List.kmz" LIMIT=25 # parse without database writes
 make kmz-import FILE="data/Rick's List.kmz" # route-filter and import into Postgres
 make export                           # write .site/data/nyc.json from Neon
@@ -67,6 +68,17 @@ The importer rejects unknown IDs and applies an entire invocation in one
 transaction. Re-running it updates the declared timestamp without duplicating
 references.
 
+## Legacy mentions
+
+`data/legacy-nyc.json` is a snapshot of the [previously deployed site
+data](https://pathikrit.github.io/restfinder/data/nyc.json) from June 4, 2026.
+`make legacy-import` maps its original CAMIS IDs to current DOHMH restaurants,
+then tries exact normalized name plus nearby coordinates for IDs that have
+changed. Only unresolved rows create `legacy_site` fallback restaurants. Every
+`foodie_urls` value is stored as its own reference URL. Atlas Obscura mentions
+set the canonical restaurant type to `Hidden / Speakeasy`. The import is
+transactional and idempotent.
+
 ## KMZ dry-run importer
 
 The checked-in `data/Rick's List.kmz` can be inspected without opening a
@@ -101,7 +113,8 @@ aliases left by older imports.
 The frontend export contains current DOHMH restaurants plus persistent fallback
 restaurants created by ad hoc importers. Every exported row has at least one
 reference, is not a chain or confirmed closed, and has map coordinates. It is
-deterministically ordered by restaurant ID.
+deterministically ordered by restaurant ID. Thus the UI is the union of Rick's
+List and restaurants carrying one or more legacy mention URLs.
 
 ## GitHub Actions
 

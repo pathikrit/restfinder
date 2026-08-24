@@ -110,7 +110,15 @@
       try {
         const url = new URL(value);
         if (url.protocol === 'http:' || url.protocol === 'https:') {
-          const label = url.hostname.replace(/^www\./, '');
+          const hostname = url.hostname.replace(/^www\./, '').replace(/^archive\./, '').replace(/^web\./, '');
+          const labels = {
+            'guide.michelin.com': 'Michelin',
+            'jamesbeard.org': 'James Beard',
+            'ny.itsfound.com': 'Itsfound',
+            'atlasobscura.com': 'Atlas Obscura',
+            'theinfatuation.com': 'Infatuation'
+          };
+          const label = labels[hostname] || hostname;
           return `<a class="reference" href="${escapeHtml(url.href)}" target="_blank" rel="noopener">${escapeHtml(label)}</a>`;
         }
       } catch (_) {}
@@ -165,7 +173,7 @@
           restaurant.cuisine ? escapeHtml(restaurant.cuisine) : '',
           address ? `<a href="https://www.google.com/maps/search/${mapQuery}" target="_blank" rel="noopener">${escapeHtml(address)}</a>` : '',
           restaurant.phone ? `<a href="tel:${escapeHtml(restaurant.phone)}">${escapeHtml(restaurant.phone)}</a>` : '',
-          referencesHtml(restaurant.references)
+          restaurant.references.length ? `<strong class="reference">Mentions:</strong> ${referencesHtml(restaurant.references)}` : ''
         ].filter(Boolean).join('<br>');
         const marker = L.marker([restaurant.lat, restaurant.lon], { icon: iconFor(restaurant.type) }).bindPopup(popup);
         if (visible.length <= 10) marker.bindTooltip(restaurant.name, { permanent: true, direction: 'top', className: 'pin-label' });
@@ -185,7 +193,7 @@
         <th>Cuisine${filterInput('cuisine')}</th>
         <th>Address${filterInput('address')}</th>
         <th class="phone-column">Phone</th>
-        <th>References${filterInput('references')}</th>
+        <th>Mentions${filterInput('references')}</th>
       </tr></thead><tbody>`;
       visible.forEach((restaurant, index) => {
         const address = restaurant.address || '';

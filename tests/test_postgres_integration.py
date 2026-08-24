@@ -6,6 +6,7 @@ import pytest
 
 from restfinder.export import export_rows
 from restfinder.kmz import KMZPlace, import_places
+from restfinder.legacy import LegacyRestaurant, import_legacy_restaurants
 from restfinder.nyc import Restaurant, upsert_snapshot
 from restfinder.references import ReferenceManifest, import_manifests
 
@@ -205,3 +206,41 @@ def test_new_fallback_import_does_not_expire_older_fallback():
         "kmz:ricks-list:first",
         "kmz:ricks-list:second",
     ]
+
+
+def test_legacy_import_uses_master_id_and_tags_atlas_obscura():
+    now = datetime(2026, 6, 4, tzinfo=timezone.utc)
+    master = row(123, name="Secret Place")
+    upsert_snapshot([master], connection_url=TEST_DATABASE_URL, observed_at=now)
+    legacy = LegacyRestaurant(
+        source_id="123",
+        name="Secret Place",
+        cuisine="American",
+        address="1 TEST STREET, Manhattan, 10001",
+        phone="2125550100",
+        latitude=40.75,
+        longitude=-73.99,
+        references=(
+            "https://www.atlasobscura.com/places/secret-place",
+            "https://guide.michelin.com/us/en/secret-place",
+        ),
+    )
+
+    result = import_legacy_restaurants(
+        [legacy],
+        connection_url=TEST_DATABASE_URL,
+        observed_at=now,
+    )
+
+    assert result.direct_id_matches == 1
+    assert result.inserted_fallbacks == 0
+    assert result.references_imported == 2
+    with psycopg.connect(TEST_DATABASE_URL) as connection:
+        assert connection.execute("SELECT count(*) FROM restaurants").fetchone()[0] == 1
+        assert connection.execute(
+            "SELECT type FROM restaurants WHERE id = %s", (master.id,)
+        ).fetchone() == ("Hidden / Speakeasy",)
+        assert connection.execute(
+            "SELECT count(*) FROM restaurant_references WHERE restaurant_id = %s",
+            (master.id,),
+        ).fetchone()[0] == 2
