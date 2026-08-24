@@ -47,19 +47,23 @@ def test_upsert_import_and_curated_export():
     manifest = ReferenceManifest("Rick's Favorites", first, ("nyc_dohmh:1", "nyc_dohmh:2"))
     assert import_manifests([manifest], connection_url=TEST_DATABASE_URL) == 2
 
+    with psycopg.connect(TEST_DATABASE_URL) as connection:
+        connection.execute("UPDATE restaurants SET type = 'Restaurant' WHERE id = 'nyc_dohmh:1'")
+
     changed = row(1, name="Updated Independent Place")
     inserted, updated = upsert_snapshot([changed, row(2, chain=True)], connection_url=TEST_DATABASE_URL, observed_at=second)
     assert (inserted, updated) == (0, 2)
 
     with psycopg.connect(TEST_DATABASE_URL) as connection:
         record = connection.execute(
-            "SELECT first_seen, last_seen, name FROM restaurants WHERE id = 'nyc_dohmh:1'"
+            "SELECT first_seen, last_seen, name, type FROM restaurants WHERE id = 'nyc_dohmh:1'"
         ).fetchone()
-        assert record == (first, second, "Updated Independent Place")
+        assert record == (first, second, "Updated Independent Place", "Restaurant")
         assert connection.execute("SELECT count(*) FROM restaurant_references").fetchone()[0] == 2
 
     exported = export_rows(connection_url=TEST_DATABASE_URL)
     assert [item["id"] for item in exported] == ["nyc_dohmh:1"]
+    assert exported[0]["type"] == "Restaurant"
     assert exported[0]["references"][0]["reference"] == "Rick's Favorites"
 
 

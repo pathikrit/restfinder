@@ -41,6 +41,8 @@
     .filter input:focus { border-color: var(--blue); }
     .empty { display: grid; min-height: 160px; place-items: center; padding: 24px; color: var(--muted); text-align: center; }
     .pin-label { padding: 2px 6px; border: 1px solid var(--line); border-radius: 4px; background: rgba(11,17,32,.9); color: var(--text); font-weight: 650; }
+    .emoji-marker { background: transparent; border: 0; }
+    .emoji-marker span { display: block; font-size: 29px; line-height: 34px; text-align: center; filter: drop-shadow(0 2px 2px rgba(0,0,0,.65)); }
     @media (max-width: 700px) {
       body { grid-template-rows: auto minmax(230px, 48vh) 1fr; }
       header { gap: 8px; padding: 8px 10px; }
@@ -62,9 +64,18 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <script>
-    const filters = { name: '', cuisine: '', address: '', references: '' };
+    const filters = { name: '', type: '', cuisine: '', address: '', references: '' };
     const markers = new Map();
     let restaurants = [];
+
+    const typeEmoji = {
+      'Restaurant': '🍝',
+      'Bars': '🍸',
+      'Coffee Shops': '☕',
+      'Dessert': '🍰',
+      'Fast Food': '🍔',
+      'Hidden / Speakeasy': '🤐'
+    };
 
     const map = L.map('map');
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -72,11 +83,21 @@
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
     }).addTo(map);
     const markerLayer = L.layerGroup().addTo(map);
-    const defaultIcon = L.icon({
-      iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
-      shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-      iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
-    });
+
+    function iconFor(type) {
+      const emoji = typeEmoji[type] || '🍴';
+      return L.divIcon({
+        html: `<span aria-hidden="true">${emoji}</span>`,
+        className: 'emoji-marker',
+        iconSize: [36, 36],
+        iconAnchor: [18, 32],
+        popupAnchor: [0, -30]
+      });
+    }
+
+    function formattedType(type) {
+      return `${typeEmoji[type] || '🍴'} ${type || 'Unclassified'}`;
+    }
 
     function escapeHtml(value) {
       return String(value == null ? '' : value).replace(/[&<>"']/g, character => ({
@@ -110,6 +131,7 @@
       return restaurants.filter(restaurant =>
         bounds.contains([restaurant.lat, restaurant.lon]) &&
         (!filters.name || (restaurant.name || '').toLowerCase().includes(filters.name)) &&
+        (!filters.type || (restaurant.type || 'unclassified').toLowerCase().includes(filters.type)) &&
         (!filters.cuisine || (restaurant.cuisine || '').toLowerCase().includes(filters.cuisine)) &&
         (!filters.address || (restaurant.address || '').toLowerCase().includes(filters.address)) &&
         (!filters.references || referenceSearchText(restaurant).includes(filters.references))
@@ -139,12 +161,13 @@
         const mapQuery = encodeURIComponent(`${restaurant.name}, ${address}`);
         const popup = [
           `<strong>${escapeHtml(restaurant.name)}</strong>`,
+          escapeHtml(formattedType(restaurant.type)),
           restaurant.cuisine ? escapeHtml(restaurant.cuisine) : '',
           address ? `<a href="https://www.google.com/maps/search/${mapQuery}" target="_blank" rel="noopener">${escapeHtml(address)}</a>` : '',
           restaurant.phone ? `<a href="tel:${escapeHtml(restaurant.phone)}">${escapeHtml(restaurant.phone)}</a>` : '',
           referencesHtml(restaurant.references)
         ].filter(Boolean).join('<br>');
-        const marker = L.marker([restaurant.lat, restaurant.lon], { icon: defaultIcon }).bindPopup(popup);
+        const marker = L.marker([restaurant.lat, restaurant.lon], { icon: iconFor(restaurant.type) }).bindPopup(popup);
         if (visible.length <= 10) marker.bindTooltip(restaurant.name, { permanent: true, direction: 'top', className: 'pin-label' });
         marker.addTo(markerLayer);
         markers.set(restaurant.id, marker);
@@ -158,6 +181,7 @@
       let html = `<table><thead><tr>
         <th>#</th>
         <th>Name${filterInput('name')}</th>
+        <th>Type${filterInput('type')}</th>
         <th>Cuisine${filterInput('cuisine')}</th>
         <th>Address${filterInput('address')}</th>
         <th class="phone-column">Phone</th>
@@ -169,6 +193,7 @@
         html += `<tr data-id="${escapeHtml(restaurant.id)}">
           <td>${index + 1}</td>
           <td title="${escapeHtml(restaurant.name)}">${escapeHtml(restaurant.name)}</td>
+          <td title="${escapeHtml(restaurant.type || 'Unclassified')}">${escapeHtml(formattedType(restaurant.type))}</td>
           <td title="${escapeHtml(restaurant.cuisine || '')}">${escapeHtml(restaurant.cuisine || '')}</td>
           <td title="${escapeHtml(address)}">${address ? `<a href="https://www.google.com/maps/search/${mapQuery}" target="_blank" rel="noopener">${escapeHtml(address)}</a>` : ''}</td>
           <td class="phone-column">${restaurant.phone ? `<a href="tel:${escapeHtml(restaurant.phone)}">${escapeHtml(restaurant.phone)}</a>` : ''}</td>

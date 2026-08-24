@@ -38,6 +38,11 @@ are refreshed while retaining `first_seen`, closure checks, and references.
 Restaurants that disappear from DOHMH remain in the database with an older
 `last_seen` value.
 
+Restaurant `type` is nullable until classification is implemented and accepts
+only: `Restaurant`, `Bars`, `Coffee Shops`, `Dessert`, `Fast Food`, or
+`Hidden / Speakeasy`. The UI displays these as 🍝, 🍸, ☕, 🍰, 🍔, and 🤐;
+unclassified restaurants use 🍴.
+
 ## Reference manifests
 
 Imports are deliberately reviewed and explicit. Create a JSON file under
