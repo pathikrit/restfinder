@@ -21,11 +21,79 @@
     * { box-sizing: border-box; }
     html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
     body { display: grid; grid-template-rows: auto minmax(260px, 55vh) 1fr; overflow: hidden; }
-    header { display: flex; align-items: center; gap: 18px; min-height: 48px; padding: 8px 16px; border-bottom: 1px solid var(--line); background: var(--panel); }
+    header { position: relative; z-index: 1001; display: grid; grid-template-columns: minmax(max-content, 1fr) minmax(280px, 600px) minmax(max-content, 1fr); align-items: center; gap: 18px; min-height: 48px; padding: 8px 16px; border-bottom: 1px solid var(--line); background: var(--panel); }
     h1 { margin: 0; font-size: 16px; letter-spacing: .01em; }
-    .status { margin-left: auto; color: var(--muted); font-size: 12px; text-align: right; }
+    .status { color: var(--muted); font-size: 12px; text-align: right; }
     .status a { color: var(--muted); text-underline-offset: 2px; }
     .status a:hover { color: var(--text); }
+    .address-search { position: relative; width: 100%; }
+    .address-search-control { position: relative; display: flex; align-items: center; }
+    .address-search-icon { position: absolute; left: 11px; color: var(--muted); font-size: 12px; pointer-events: none; }
+    .address-search input {
+      width: 100%;
+      height: 34px;
+      padding: 6px 38px 6px 34px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      outline: none;
+      background: var(--bg);
+      color: var(--text);
+      font: inherit;
+    }
+    .address-search input::placeholder { color: var(--muted); }
+    .address-search input:focus { border-color: var(--blue); box-shadow: 0 0 0 2px rgba(96,165,250,.12); }
+    .address-search button[type="submit"] {
+      position: absolute;
+      right: 4px;
+      display: grid;
+      width: 28px;
+      height: 26px;
+      padding: 0;
+      place-items: center;
+      border: 0;
+      border-radius: 5px;
+      background: transparent;
+      color: var(--blue);
+      cursor: pointer;
+    }
+    .address-search button[type="submit"]:hover, .address-search button[type="submit"]:focus-visible { background: rgba(96,165,250,.14); outline: none; }
+    .address-results {
+      position: absolute;
+      top: calc(100% + 5px);
+      right: 0;
+      left: 0;
+      z-index: 1100;
+      max-height: min(360px, 55vh);
+      margin: 0;
+      padding: 5px;
+      overflow-y: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: 0 12px 28px rgba(0,0,0,.45);
+      list-style: none;
+    }
+    .address-results[hidden] { display: none; }
+    .address-result button {
+      display: grid;
+      grid-template-columns: 24px minmax(0, 1fr);
+      gap: 7px;
+      width: 100%;
+      padding: 8px;
+      border: 0;
+      border-radius: 5px;
+      background: transparent;
+      color: var(--text);
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+    }
+    .address-result button:hover, .address-result[aria-selected="true"] button { background: var(--panel-soft); }
+    .address-result i { padding-top: 3px; color: var(--blue); text-align: center; }
+    .address-result-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .search-credit { padding: 5px 8px 3px; color: var(--muted); font-size: 10px; text-align: right; }
+    .search-credit a { color: var(--muted); }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
     #map { width: 100%; height: 100%; }
     #table-wrap { overflow: auto; border-top: 1px solid var(--line); }
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -98,9 +166,10 @@
     .metadata-value a { overflow-wrap: anywhere; }
     @media (max-width: 700px) {
       body { grid-template-rows: auto minmax(230px, 48vh) 1fr; }
-      header { gap: 8px; padding: 8px 10px; }
+      header { grid-template-columns: minmax(0, 1fr) max-content; gap: 7px 10px; padding: 8px 10px; }
       h1 { font-size: 14px; }
       .status { font-size: 10px; }
+      .address-search { grid-column: 1 / -1; grid-row: 2; }
       th, td { padding: 7px; }
     }
   </style>
@@ -108,6 +177,16 @@
 <body>
   <header>
     <h1>Rick's Restaurant Finder</h1>
+    <form id="address-search" class="address-search" role="search" autocomplete="off">
+      <label class="sr-only" for="address-query">Search for an address in the NYC metro area</label>
+      <div class="address-search-control">
+        <i class="fa-solid fa-magnifying-glass address-search-icon" aria-hidden="true"></i>
+        <input id="address-query" type="search" inputmode="search" placeholder="Search an NYC metro address…" aria-autocomplete="list" aria-controls="address-results" aria-expanded="false">
+        <button type="submit" aria-label="Zoom to address" title="Zoom to address"><i class="fa-solid fa-location-crosshairs" aria-hidden="true"></i></button>
+      </div>
+      <ul id="address-results" class="address-results" role="listbox" hidden></ul>
+      <span id="address-search-status" class="sr-only" aria-live="polite"></span>
+    </form>
     <span id="status" class="status">Loading…</span>
   </header>
   <main id="map" aria-label="Restaurant map"></main>
@@ -118,6 +197,10 @@
     const filters = { name: '', type: '', references: '' };
     const markers = new Map();
     let restaurants = [];
+    let addressResults = [];
+    let activeAddressIndex = -1;
+    let addressSearchTimer;
+    let addressSearchController;
 
     const typeColor = {
       'Restaurant': '#dc2626',
@@ -137,7 +220,7 @@
       'Hidden / Speakeasy': 'danger'
     };
 
-    const map = L.map('map');
+    const map = L.map('map').setView([40.758, -73.9855], 12);
     map.attributionControl.setPrefix('<a href="https://leafletjs.com" target="_blank" rel="noopener">Leaflet</a>');
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
       minZoom: 0,
@@ -146,6 +229,150 @@
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>'
     }).addTo(map);
     const markerLayer = L.layerGroup().addTo(map);
+    const addressLayer = L.layerGroup().addTo(map);
+
+    const addressForm = document.getElementById('address-search');
+    const addressInput = document.getElementById('address-query');
+    const addressResultsList = document.getElementById('address-results');
+    const addressSearchStatus = document.getElementById('address-search-status');
+    const metroBounds = '-74.50,40.40,-73.20,41.20';
+
+    function addressLabel(feature) {
+      const properties = feature.properties || {};
+      const streetAddress = [properties.housenumber, properties.street].filter(Boolean).join(' ');
+      const parts = [streetAddress || properties.name, properties.city || properties.locality || properties.county, properties.state, properties.postcode];
+      return parts.filter((part, index) => part && parts.indexOf(part) === index).join(', ');
+    }
+
+    function hideAddressResults() {
+      addressResultsList.hidden = true;
+      addressInput.setAttribute('aria-expanded', 'false');
+      activeAddressIndex = -1;
+    }
+
+    function renderAddressResults() {
+      if (!addressResults.length) {
+        hideAddressResults();
+        return;
+      }
+      addressResultsList.innerHTML = addressResults.map((feature, index) => `
+        <li class="address-result" role="option" aria-selected="${index === activeAddressIndex}" data-index="${index}">
+          <button type="button" tabindex="-1" data-index="${index}">
+            <i class="fa-solid fa-location-dot" aria-hidden="true"></i>
+            <span class="address-result-label">${escapeHtml(addressLabel(feature))}</span>
+          </button>
+        </li>`).join('') + `
+        <li class="search-credit" role="presentation">Search by <a href="https://photon.komoot.io" target="_blank" rel="noopener">Photon</a> · <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a></li>`;
+      addressResultsList.hidden = false;
+      addressInput.setAttribute('aria-expanded', 'true');
+    }
+
+    async function searchAddresses(query) {
+      if (addressSearchController) addressSearchController.abort();
+      addressSearchController = new AbortController();
+      const center = map.getCenter();
+      const parameters = new URLSearchParams({
+        q: query,
+        limit: '10',
+        lang: 'en',
+        bbox: metroBounds,
+        lat: String(center.lat),
+        lon: String(center.lng),
+        zoom: String(map.getZoom())
+      });
+      addressSearchStatus.textContent = 'Searching addresses…';
+      try {
+        const response = await fetch(`https://photon.komoot.io/api/?${parameters}`, {
+          signal: addressSearchController.signal
+        });
+        if (!response.ok) throw new Error('Address search failed');
+        const payload = await response.json();
+        const labels = new Set();
+        addressResults = (payload.features || []).filter(feature => {
+          if (!Array.isArray(feature.geometry?.coordinates) || feature.geometry.coordinates.length < 2) return false;
+          const label = addressLabel(feature);
+          if (!label || labels.has(label)) return false;
+          labels.add(label);
+          return true;
+        }).slice(0, 6);
+        activeAddressIndex = -1;
+        renderAddressResults();
+        addressSearchStatus.textContent = addressResults.length ? `${addressResults.length} address suggestions available.` : 'No matching addresses found.';
+        return addressResults;
+      } catch (error) {
+        if (error.name === 'AbortError') return [];
+        addressResults = [];
+        hideAddressResults();
+        addressSearchStatus.textContent = 'Address search is temporarily unavailable.';
+        return [];
+      }
+    }
+
+    function selectAddress(index) {
+      const feature = addressResults[index];
+      if (!feature) return;
+      const [lon, lat] = feature.geometry.coordinates;
+      const label = addressLabel(feature);
+      addressInput.value = label;
+      hideAddressResults();
+      addressLayer.clearLayers();
+      L.circleMarker([lat, lon], {
+        radius: 8,
+        color: '#e5e7eb',
+        weight: 3,
+        fillColor: '#3b82f6',
+        fillOpacity: 1
+      }).bindTooltip(label, { direction: 'top' }).addTo(addressLayer);
+      map.flyTo([lat, lon], 16, { duration: .7 });
+      addressSearchStatus.textContent = `Map centered on ${label}.`;
+    }
+
+    addressInput.addEventListener('input', () => {
+      clearTimeout(addressSearchTimer);
+      const query = addressInput.value.trim();
+      if (query.length < 3) {
+        if (addressSearchController) addressSearchController.abort();
+        addressResults = [];
+        hideAddressResults();
+        return;
+      }
+      addressSearchTimer = setTimeout(() => searchAddresses(query), 300);
+    });
+
+    addressInput.addEventListener('keydown', event => {
+      if (event.key === 'Escape') {
+        hideAddressResults();
+        return;
+      }
+      if (!addressResults.length || !['ArrowDown', 'ArrowUp'].includes(event.key)) return;
+      event.preventDefault();
+      const direction = event.key === 'ArrowDown' ? 1 : -1;
+      activeAddressIndex = (activeAddressIndex + direction + addressResults.length) % addressResults.length;
+      renderAddressResults();
+      addressResultsList.querySelector(`[data-index="${activeAddressIndex}"]`)?.scrollIntoView({ block: 'nearest' });
+    });
+
+    addressForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      clearTimeout(addressSearchTimer);
+      if (activeAddressIndex >= 0) {
+        selectAddress(activeAddressIndex);
+        return;
+      }
+      const query = addressInput.value.trim();
+      if (query.length < 3) return;
+      const results = await searchAddresses(query);
+      if (results.length) selectAddress(0);
+    });
+
+    addressResultsList.addEventListener('mousedown', event => event.preventDefault());
+    addressResultsList.addEventListener('click', event => {
+      const button = event.target.closest('button[data-index]');
+      if (button) selectAddress(Number(button.dataset.index));
+    });
+    document.addEventListener('click', event => {
+      if (!addressForm.contains(event.target)) hideAddressResults();
+    });
 
     function iconFor(type) {
       const icon = typeIcon[type] || typeIcon.Restaurant;
