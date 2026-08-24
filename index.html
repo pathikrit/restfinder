@@ -308,8 +308,12 @@
       fetch('data/nyc.json').then(response => {
         if (!response.ok) throw new Error('Could not load data/nyc.json');
         return response.json();
+      }),
+      fetch('build.json').then(response => {
+        if (!response.ok) throw new Error('Could not load build.json');
+        return response.json();
       })
-    ]).then(([cities, data]) => {
+    ]).then(([cities, data, build]) => {
       const city = cities.find(item => item.key === 'nyc');
       map.setView([city.lat, city.lng], city.zoom);
       restaurants = data;
@@ -320,7 +324,7 @@
         year: '2-digit',
         timeZone: 'UTC'
       }).replace(/ /g, '-') : '';
-      document.getElementById('status').innerHTML = `${restaurants.length} places${updated ? ` · Updated <a href="https://github.com/pathikrit/restfinder/commit/main" target="_blank" rel="noopener" title="View deployed commit">${updated}</a>` : ''}`;
+      document.getElementById('status').innerHTML = `${restaurants.length} places${updated ? ` · Updated <a href="${escapeHtml(build.url)}" target="_blank" rel="noopener" title="View deployment run">${updated}</a>` : ''}`;
       render();
       map.on('moveend', render);
     }).catch(error => {

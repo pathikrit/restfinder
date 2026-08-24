@@ -10,6 +10,7 @@ fetch: _migrate
 
 _export: _migrate
 	$(PYTHON) -m restfinder.export
+	$(PYTHON) -m restfinder.site_metadata
 
 build: _export
 	@mkdir -p .site
