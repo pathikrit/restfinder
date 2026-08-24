@@ -27,6 +27,7 @@ make migrate                          # apply schema migrations
 make fetch                            # fetch and upsert the current NYC snapshot
 make import FILE=imports/example.json # apply one reference manifest
 make import-all                       # apply every imports/*.json manifest
+make kmz-dry-run FILE="data/Rick's List.kmz" LIMIT=25 # parse without database writes
 make export                           # write .site/data/nyc.json from Neon
 make build                            # export data and assemble the static site
 make dev                              # build and serve http://localhost:8080
@@ -62,6 +63,23 @@ Imports are deliberately reviewed and explicit. Create a JSON file under
 The importer rejects unknown IDs and applies an entire invocation in one
 transaction. Re-running it updates the declared timestamp without duplicating
 references.
+
+## KMZ dry-run importer
+
+The checked-in `data/Rick's List.kmz` can be inspected without opening a
+database connection:
+
+```bash
+make kmz-dry-run FILE="data/Rick's List.kmz" LIMIT=25
+```
+
+The parser reads every KML placemark without extracting the archive. Its default
+output contains restaurant candidates from the `Restaurants`, `Cocktail Bars`,
+and `Cafes, Ice Cream and Bakeries` folders, along with counts for the skipped
+non-food folders. `Restaurants` and `Cocktail Bars` receive type hints;
+cafe/bakery entries remain unclassified because the source folder does not
+distinguish coffee shops from desserts. The dry-run command never reads `.env`
+or connects to Postgres.
 
 ## Static export
 
