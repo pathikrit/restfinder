@@ -17,6 +17,11 @@ class DevelopmentHandler(SimpleHTTPRequestHandler):
             return str(self.source_root / "index.html")
         if request_path == "/cities.json":
             return str(self.source_root / "cities.json")
+        if request_path.startswith("/assets/"):
+            assets_root = (self.source_root / "assets").resolve()
+            candidate = (self.source_root / request_path.lstrip("/")).resolve()
+            if candidate.is_relative_to(assets_root):
+                return str(candidate)
         return super().translate_path(path)
 
 

@@ -33,6 +33,8 @@ export: migrate
 site:
 	@mkdir -p .site
 	cp -f cities.json index.html .site/
+	@mkdir -p .site/assets
+	cp -R assets/. .site/assets/
 
 build: export site
 
