@@ -14,6 +14,8 @@ operational notes in this file instead.
   Each recommendation URL or list name is a separate reference.
 - The frontend is the static `index.html`; `src/restfinder/export.py` writes
   `.site/data/nyc.json`.
+- Map category glyphs are official CC0 Maki SVGs under `assets/maki/`; do not
+  replace them with emoji or hand-authored pictograms.
 - The UI includes restaurants referenced by Rick's List or by one or more
   legacy mention URLs, excluding chains, confirmed closures, historical DOHMH
   rows, and records without coordinates.
@@ -39,17 +41,15 @@ the Socrata `X-App-Token` header when present. CI can provide a complete
 
 | Command | Purpose |
 | --- | --- |
-| `make migrate` | Apply Alembic migrations |
 | `make fetch` | Fetch and upsert the current DOHMH snapshot |
-| `make import FILE=imports/example.json` | Import one reference manifest |
-| `make import-all` | Replay manifests and the legacy snapshot |
-| `make legacy-import` | Replay legacy mention URLs |
-| `make kmz-dry-run FILE="data/Rick's List.kmz" LIMIT=25` | Parse KMZ without database writes |
-| `make kmz-import FILE="data/Rick's List.kmz"` | Route-filter and import the KMZ |
-| `make export` | Write `.site/data/nyc.json` |
 | `make build` | Export data and assemble the static site |
 | `make dev` | Export data and serve source frontend files on port 8080 |
 | `make test` | Run unit and PostgreSQL integration tests |
+
+The Makefile intentionally covers only recurring development and deployment.
+One-time imports are run explicitly through their modules in `src/restfinder/`;
+their source snapshots stay checked in under `data/` or `imports/` and are never
+replayed automatically by CI.
 
 ## DOHMH ingestion
 
@@ -63,6 +63,11 @@ DOHMH snapshot.
 The current chain heuristic marks normalized names with more than five
 locations as chains. Supported types are `Restaurant`, `Bars`, `Coffee Shops`,
 `Dessert`, `Fast Food`, and `Hidden / Speakeasy`.
+
+Shouty uppercase source names are converted to readable title casing by
+`restfinder.names.display_name`; already-styled mixed/lowercase names are kept.
+Chain detection and importer matching use case-insensitive normalized keys, so
+display casing never determines restaurant identity.
 
 ## Reference manifests
 
@@ -111,6 +116,6 @@ Folder types map as follows:
 
 `.github/workflows/deploy.yml` tests pushes and pull requests against PostgreSQL.
 Pushes to `main` export Neon and deploy GitHub Pages. The monthly schedule and
-manual dispatch also refresh DOHMH and replay checked-in imports before export.
-`DATABASE_URL` is the required repository secret; `NYC_OPEN_DATA_APP_TOKEN` is
-optional.
+manual dispatch also refresh DOHMH before export. Checked-in one-time imports
+are not replayed. `DATABASE_URL` is the required repository secret;
+`NYC_OPEN_DATA_APP_TOKEN` is optional.

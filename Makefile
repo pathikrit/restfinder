@@ -1,47 +1,26 @@
-.PHONY: migrate fetch import import-all legacy-import kmz-dry-run kmz-import export site build dev test clean
+.PHONY: fetch build dev test clean _migrate _export
 
 PYTHON := PYTHONPATH=src uv run python
 
-migrate:
+_migrate:
 	PYTHONPATH=src uv run alembic upgrade head
 
-fetch: migrate
+fetch: _migrate
 	$(PYTHON) -m restfinder.nyc
 
-import: migrate
-	@test -n "$(FILE)" || { echo "Usage: make import FILE=imports/example.json"; exit 1; }
-	$(PYTHON) -m restfinder.references "$(FILE)"
-
-import-all: migrate
-	$(PYTHON) -m restfinder.references
-	$(PYTHON) -m restfinder.legacy data/legacy-nyc.json
-
-legacy-import: migrate
-	$(PYTHON) -m restfinder.legacy data/legacy-nyc.json
-
-kmz-dry-run:
-	@test -n "$(FILE)" || { echo "Usage: make kmz-dry-run FILE=\"data/Rick's List.kmz\" [LIMIT=25]"; exit 1; }
-	$(PYTHON) -m restfinder.kmz "$(FILE)" $(if $(LIMIT),--limit $(LIMIT),)
-
-kmz-import: migrate
-	@test -n "$(FILE)" || { echo "Usage: make kmz-import FILE=\"data/Rick's List.kmz\""; exit 1; }
-	$(PYTHON) -m restfinder.kmz "$(FILE)" --import-db
-
-export: migrate
+_export: _migrate
 	$(PYTHON) -m restfinder.export
 
-site:
+build: _export
 	@mkdir -p .site
 	cp -f cities.json index.html .site/
 	@mkdir -p .site/assets
 	cp -R assets/. .site/assets/
 
-build: export site
-
-dev: export
+dev: _export
 	$(PYTHON) -m restfinder.dev
 
-test:
+test: _migrate
 	PYTHONPATH=src uv run pytest
 
 clean:
