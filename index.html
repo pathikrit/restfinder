@@ -261,6 +261,7 @@
     const addressSearchStatus = document.getElementById('address-search-status');
     const locateButton = document.getElementById('locate-me');
     const metroBounds = '-74.50,40.40,-73.20,41.20';
+    const detailZoom = 18;
 
     function addressLabel(feature) {
       const properties = feature.properties || {};
@@ -348,7 +349,7 @@
         fillColor: '#3b82f6',
         fillOpacity: 1
       }).bindTooltip(label, { direction: 'top' }).addTo(addressLayer);
-      map.flyTo([lat, lon], 16, { duration: .7 });
+      map.flyTo([lat, lon], detailZoom, { duration: .7 });
       addressSearchStatus.textContent = `Map centered on ${label}.`;
     }
 
@@ -385,7 +386,7 @@
           fillColor: '#3b82f6',
           fillOpacity: 1
         }).bindTooltip('Your current location', { direction: 'top' }).addTo(addressLayer);
-        map.flyTo([latitude, longitude], 16, { duration: .7 });
+        map.flyTo([latitude, longitude], detailZoom, { duration: .7 });
         addressSearchStatus.textContent = 'Map centered on your current location.';
         finishLocationRequest();
       }, error => {
@@ -526,7 +527,7 @@
       document.querySelectorAll('tbody tr').forEach(row => row.classList.toggle('selected', row.dataset.id === id));
       const marker = markers.get(id);
       if (marker) {
-        map.panTo(marker.getLatLng());
+        map.flyTo(marker.getLatLng(), detailZoom, { duration: .7 });
         marker.openPopup();
       }
     }
