@@ -237,7 +237,7 @@
         html += `<tr data-id="${escapeHtml(restaurant.id)}">
           <td>${index + 1}</td>
           <td title="${escapeHtml(restaurant.name)}">${escapeHtml(restaurant.name)}</td>
-          <td title="${escapeHtml(restaurant.type || 'Unclassified')}">${escapeHtml(formattedType(restaurant.type))}</td>
+          <td title="${escapeHtml(restaurant.type || 'Unclassified')}">${escapeHtml(restaurant.type || 'Unclassified')}</td>
           <td title="${escapeHtml(restaurant.cuisine || '')}">${escapeHtml(restaurant.cuisine || '')}</td>
           <td title="${escapeHtml(address || 'Open in Google Maps')}"><a href="${mapUrl}" target="_blank" rel="noopener">${escapeHtml(address || 'Open in Google Maps')}</a></td>
           <td class="phone-column">${restaurant.phone ? `<a href="tel:${escapeHtml(restaurant.phone)}">${escapeHtml(restaurant.phone)}</a>` : ''}</td>
