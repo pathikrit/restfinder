@@ -311,7 +311,7 @@
         if (!response.ok) throw new Error('Could not load data/nyc.json');
         return response.json();
       }),
-      fetch('build.json').then(response => {
+      fetch('build.json', { cache: 'no-store' }).then(response => {
         if (!response.ok) throw new Error('Could not load build.json');
         return response.json();
       })
