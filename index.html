@@ -4,7 +4,6 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Rick's Restaurant Finder</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍴</text></svg>">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
   <style>
     :root {
@@ -54,16 +53,18 @@
       background: var(--pin-color);
       box-shadow: 0 2px 5px rgba(0,0,0,.65);
     }
-    .map-pin::after {
-      content: '';
+    .map-pin svg {
       position: absolute;
-      top: 8px;
-      left: 8px;
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: #fff;
-      box-shadow: 0 0 0 1px rgba(0,0,0,.15);
+      top: 4px;
+      left: 4px;
+      width: 15px;
+      height: 15px;
+      transform: rotate(45deg);
+      fill: none;
+      stroke: #fff;
+      stroke-width: 2.2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
     }
     @media (max-width: 700px) {
       body { grid-template-rows: auto minmax(230px, 48vh) 1fr; }
@@ -90,15 +91,6 @@
     const markers = new Map();
     let restaurants = [];
 
-    const typeEmoji = {
-      'Restaurant': '🍝',
-      'Bars': '🍸',
-      'Coffee Shops': '☕',
-      'Dessert': '🍰',
-      'Fast Food': '🍔',
-      'Hidden / Speakeasy': '🤐'
-    };
-
     const typeColor = {
       'Restaurant': '#dc2626',
       'Bars': '#7c3aed',
@@ -106,6 +98,16 @@
       'Dessert': '#db2777',
       'Fast Food': '#ea580c',
       'Hidden / Speakeasy': '#111827'
+    };
+
+    const typeGlyph = {
+      'Restaurant': '<path d="M4 3v5M7 3v5M10 3v5M4 8h6M7 8v13M16 3v18M16 3c3 2 4 5 4 8h-4"/>',
+      'Bars': '<path d="M4 4h16l-8 9-8-9M12 13v7M8 20h8"/>',
+      'Coffee Shops': '<path d="M5 8h11v6a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4V8M16 10h2a3 3 0 0 1 0 6h-2M8 4v1M12 3v2"/>',
+      'Dessert': '<path d="M4 10h16v10H4zM4 14h16M8 10V7M12 10V5M16 10V7"/>',
+      'Fast Food': '<path d="M5 10a7 5 0 0 1 14 0M4 10h16M5 14h14M4 18h16M6 21h12"/>',
+      'Hidden / Speakeasy': '<path d="M14 4a5 5 0 1 0 4 8l2 2-2 2 2 2-2 2-4-4M7 9h.01"/>',
+      'Unclassified': '<circle cx="12" cy="12" r="5"/>'
     };
 
     const map = L.map('map');
@@ -116,17 +118,14 @@
     const markerLayer = L.layerGroup().addTo(map);
 
     function iconFor(type) {
+      const glyph = typeGlyph[type] || typeGlyph.Unclassified;
       return L.divIcon({
-        html: `<span class="map-pin" style="--pin-color:${typeColor[type] || '#2563eb'}" aria-hidden="true"></span>`,
+        html: `<span class="map-pin" style="--pin-color:${typeColor[type] || '#2563eb'}" aria-hidden="true"><svg viewBox="0 0 24 24">${glyph}</svg></span>`,
         className: 'map-pin-marker',
         iconSize: [35, 42],
         iconAnchor: [17, 39],
         popupAnchor: [0, -36]
       });
-    }
-
-    function formattedType(type) {
-      return `${typeEmoji[type] || '🍴'} ${type || 'Unclassified'}`;
     }
 
     function escapeHtml(value) {
@@ -205,13 +204,19 @@
         const mapUrl = googleMapsUrl(restaurant);
         const popup = [
           `<strong>${escapeHtml(restaurant.name)}</strong>`,
-          escapeHtml(formattedType(restaurant.type)),
+          escapeHtml(restaurant.type || 'Unclassified'),
           restaurant.cuisine ? escapeHtml(restaurant.cuisine) : '',
           `<a href="${mapUrl}" target="_blank" rel="noopener">${escapeHtml(address || 'Open in Google Maps')}</a>`,
           restaurant.phone ? `<a href="tel:${escapeHtml(restaurant.phone)}">${escapeHtml(restaurant.phone)}</a>` : '',
           restaurant.references.length ? `<strong class="reference">Mentions:</strong> ${referencesHtml(restaurant.references)}` : ''
         ].filter(Boolean).join('<br>');
-        const marker = L.marker([restaurant.lat, restaurant.lon], { icon: iconFor(restaurant.type) }).bindPopup(popup);
+        const markerType = restaurant.type || 'Unclassified';
+        const marker = L.marker([restaurant.lat, restaurant.lon], {
+          icon: iconFor(restaurant.type),
+          title: `${markerType}: ${restaurant.name}`,
+          alt: `${markerType}: ${restaurant.name}`,
+          riseOnHover: true
+        }).bindPopup(popup);
         if (visible.length <= 10) marker.bindTooltip(restaurant.name, { permanent: true, direction: 'top', className: 'pin-label' });
         marker.addTo(markerLayer);
         markers.set(restaurant.id, marker);
