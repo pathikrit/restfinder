@@ -25,7 +25,9 @@ build: _export
 	@mkdir -p .site/assets
 	cp -R assets/. .site/assets/
 
-dev: _export
+dev:
+	$(PYTHON) -m restfinder.dev --ensure-port
+	$(MAKE) _export
 	$(PYTHON) -m restfinder.dev
 
 test: _migrate
