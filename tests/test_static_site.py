@@ -41,6 +41,19 @@ def test_frontend_uses_social_domains_as_reference_labels():
     assert "`${referenceLabel(value)} ${value}`" in html
 
 
+def test_map_popup_is_wide_and_survives_map_autopan():
+    html = (ROOT / "index.html").read_text()
+
+    assert "const minWidth = Math.min(300, availableWidth);" in html
+    assert "autoPanPadding: [20, 20]" in html
+    assert "keepInView: true" in html
+    assert "markerLayer.clearLayers();" not in html
+    assert "id !== activePopupRestaurantId" in html
+    assert "marker.on('popupopen'" in html
+    assert "pendingPopupRestaurantId !== id" in html
+    assert "map.getCenter().distanceTo(target) < 1" in html
+
+
 def test_build_copies_pwa_files():
     makefile = (ROOT / "Makefile").read_text()
 

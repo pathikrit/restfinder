@@ -220,6 +220,9 @@
   <script>
     const filters = { name: '', type: '', references: '' };
     const markers = new Map();
+    let selectedRestaurantId = null;
+    let activePopupRestaurantId = null;
+    let pendingPopupRestaurantId = null;
     let restaurants = [];
     let addressResults = [];
     let activeAddressIndex = -1;
@@ -254,6 +257,7 @@
     }).addTo(map);
     const markerLayer = L.layerGroup().addTo(map);
     const addressLayer = L.layerGroup().addTo(map);
+    map.on('click', () => { pendingPopupRestaurantId = null; });
 
     const addressForm = document.getElementById('address-search');
     const addressInput = document.getElementById('address-query');
@@ -540,20 +544,59 @@
     }
 
     function selectRestaurant(id) {
+      selectedRestaurantId = id;
       document.querySelectorAll('tbody tr').forEach(row => row.classList.toggle('selected', row.dataset.id === id));
       const marker = markers.get(id);
       if (marker) {
-        map.flyTo(marker.getLatLng(), detailZoom, { duration: .7 });
-        marker.openPopup();
+        const target = marker.getLatLng();
+        pendingPopupRestaurantId = id;
+        map.closePopup();
+        if (map.getZoom() === detailZoom && map.getCenter().distanceTo(target) < 1) {
+          pendingPopupRestaurantId = null;
+          marker.openPopup();
+          return;
+        }
+        map.once('moveend', () => {
+          if (pendingPopupRestaurantId !== id) return;
+          pendingPopupRestaurantId = null;
+          markers.get(id)?.openPopup();
+        });
+        map.flyTo(target, detailZoom, { duration: .7 });
       }
+    }
+
+    function popupOptions() {
+      const availableWidth = Math.max(180, map.getSize().x - 80);
+      const minWidth = Math.min(300, availableWidth);
+      return {
+        minWidth,
+        maxWidth: Math.max(minWidth, Math.min(380, availableWidth)),
+        autoPan: true,
+        autoPanPadding: [20, 20],
+        keepInView: true
+      };
     }
 
     function render() {
       const visible = filteredRestaurants();
-      markerLayer.clearLayers();
-      markers.clear();
+      const visibleIds = new Set(visible.map(restaurant => restaurant.id));
+      markers.forEach((marker, id) => {
+        if (!visibleIds.has(id) && id !== activePopupRestaurantId) {
+          markerLayer.removeLayer(marker);
+          markers.delete(id);
+        }
+      });
 
       visible.forEach(restaurant => {
+        const existingMarker = markers.get(restaurant.id);
+        if (existingMarker) {
+          if (visible.length <= 10 && !existingMarker.getTooltip()) {
+            existingMarker.bindTooltip(restaurant.name, { permanent: true, direction: 'top', className: 'pin-label' });
+          } else if (visible.length > 10 && existingMarker.getTooltip()) {
+            existingMarker.unbindTooltip();
+          }
+          return;
+        }
         const address = restaurant.address || '';
         const mapUrl = googleMapsUrl(restaurant);
         const metadata = [
@@ -581,7 +624,14 @@
           title: `${markerType}: ${restaurant.name}`,
           alt: `${markerType}: ${restaurant.name}`,
           riseOnHover: true
-        }).bindPopup(popup);
+        }).bindPopup(popup, popupOptions());
+        marker.on('popupopen', () => {
+          pendingPopupRestaurantId = null;
+          activePopupRestaurantId = restaurant.id;
+        });
+        marker.on('popupclose', () => {
+          if (activePopupRestaurantId === restaurant.id) activePopupRestaurantId = null;
+        });
         if (visible.length <= 10) marker.bindTooltip(restaurant.name, { permanent: true, direction: 'top', className: 'pin-label' });
         marker.addTo(markerLayer);
         markers.set(restaurant.id, marker);
@@ -600,7 +650,7 @@
       </tr></thead><tbody>`;
       visible.forEach((restaurant, index) => {
         const mapUrl = googleMapsUrl(restaurant);
-        html += `<tr data-id="${escapeHtml(restaurant.id)}">
+        html += `<tr class="${restaurant.id === selectedRestaurantId ? 'selected' : ''}" data-id="${escapeHtml(restaurant.id)}">
           <td>${index + 1}</td>
           <td title="${escapeHtml(restaurant.name)}">
             <span class="restaurant-name">${escapeHtml(restaurant.name)}</span>
