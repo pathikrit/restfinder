@@ -26,35 +26,43 @@ def test_web_app_manifest_has_installable_icons():
 
 def test_frontend_registers_pwa_and_native_location_support():
     html = (ROOT / "index.html").read_text()
+    javascript = (ROOT / "assets/app.js").read_text()
 
     assert 'rel="manifest" href="manifest.webmanifest"' in html
     assert 'rel="apple-touch-icon"' in html
-    assert "navigator.serviceWorker.register('service-worker.js')" in html
-    assert "navigator.geolocation.getCurrentPosition" in html
+    assert "navigator.serviceWorker.register('service-worker.js')" in javascript
+    assert "navigator.serviceWorker.getRegistrations()" in javascript
+    assert "['localhost', '127.0.0.1']" in javascript
+    assert "navigator.geolocation.getCurrentPosition" in javascript
 
 
 def test_frontend_uses_social_domains_as_reference_labels():
+    javascript = (ROOT / "assets/app.js").read_text()
+
+    assert "'instagram.com': 'Instagram'" in javascript
+    assert "'tiktok.com': 'TikTok'" in javascript
+    assert "`${referenceLabel(value)} ${value}`" in javascript
+
+
+def test_frontend_uses_google_maps_and_live_place_details():
     html = (ROOT / "index.html").read_text()
+    javascript = (ROOT / "assets/app.js").read_text()
 
-    assert "'instagram.com': 'Instagram'" in html
-    assert "'tiktok.com': 'TikTok'" in html
-    assert "`${referenceLabel(value)} ${value}`" in html
-
-
-def test_map_popup_is_wide_and_survives_map_autopan():
-    html = (ROOT / "index.html").read_text()
-
-    assert "const minWidth = Math.min(300, availableWidth);" in html
-    assert "autoPanPadding: [20, 20]" in html
-    assert "keepInView: true" in html
-    assert "markerLayer.clearLayers();" not in html
-    assert "id !== activePopupRestaurantId" in html
-    assert "marker.on('popupopen'" in html
-    assert "pendingPopupRestaurantId !== id" in html
-    assert "map.getCenter().distanceTo(target) < 1" in html
+    assert "leaflet" not in html.lower()
+    assert "maps.googleapis.com/maps/api/js" in javascript
+    assert "AdvancedMarkerElement" in javascript
+    assert "PlaceAutocompleteElement" in javascript
+    assert "colorScheme: 'DARK'" in javascript
+    assert "gmp-place-opening-hours" in javascript
+    assert "gmp-place-price" in javascript
+    assert "gmp-place-open-now-status" in javascript
+    assert "assets/maki/" in javascript
+    assert ">Open in Maps</a>" in javascript
+    assert "RestFinder details" not in javascript
+    assert "restaurant.google_place_id ? mentionMetadata" in javascript
 
 
 def test_build_copies_pwa_files():
     makefile = (ROOT / "Makefile").read_text()
 
-    assert "manifest.webmanifest service-worker.js .site/" in makefile
+    assert "manifest.webmanifest service-worker.js privacy.html terms.html NOTICE .site/" in makefile

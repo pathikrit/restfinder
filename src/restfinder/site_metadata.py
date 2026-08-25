@@ -8,8 +8,11 @@ from pathlib import Path
 import subprocess
 from typing import Mapping
 
+from restfinder.config import load_environment
+
 
 OUTPUT_PATH = Path(".site/build.json")
+CONFIG_PATH = Path(".site/config.json")
 DEFAULT_REPOSITORY = "pathikrit/restfinder"
 DEFAULT_SERVER_URL = "https://github.com"
 
@@ -42,8 +45,30 @@ def write_metadata(path: Path = OUTPUT_PATH) -> None:
     )
 
 
+def write_runtime_config(
+    path: Path = CONFIG_PATH,
+    environment: Mapping[str, str] | None = None,
+) -> None:
+    if environment is None:
+        load_environment()
+        environment = os.environ
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "google_maps_browser_key": environment.get("GOOGLE_MAPS_BROWSER_KEY", ""),
+                "google_map_id": environment.get("GOOGLE_MAP_ID", ""),
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
 def main() -> None:
     write_metadata()
+    write_runtime_config()
     print(f"Wrote build metadata to {OUTPUT_PATH}.")
 
 

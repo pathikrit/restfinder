@@ -11,6 +11,10 @@ from urllib.parse import urlsplit
 class DevelopmentHandler(SimpleHTTPRequestHandler):
     source_root = Path.cwd().resolve()
 
+    def end_headers(self) -> None:
+        self.send_header("Cache-Control", "no-store")
+        super().end_headers()
+
     def translate_path(self, path: str) -> str:
         request_path = urlsplit(path).path
         if request_path in {"/", "/index.html"}:

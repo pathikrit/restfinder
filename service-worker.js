@@ -1,9 +1,14 @@
-const CACHE_NAME = 'restfinder-v1';
+const CACHE_NAME = 'restfinder-v3';
 const APP_SHELL = [
   './',
   './index.html',
   './cities.json',
   './manifest.webmanifest',
+  './privacy.html',
+  './terms.html',
+  './NOTICE',
+  './assets/app.css?v=3',
+  './assets/app.js?v=3',
   './assets/icons/app-icon.svg',
   './assets/icons/app-icon-192.png',
   './assets/icons/app-icon-512.png',
@@ -49,7 +54,7 @@ self.addEventListener('fetch', event => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  if (request.mode === 'navigate' || url.pathname.endsWith('/data/nyc.json') || url.pathname.endsWith('/build.json')) {
+  if (request.mode === 'navigate' || url.pathname.endsWith('/data/nyc.json') || url.pathname.endsWith('/build.json') || url.pathname.endsWith('/config.json')) {
     event.respondWith(networkFirst(request));
     return;
   }

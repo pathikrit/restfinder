@@ -1,0 +1,7 @@
+RestFinder data enrichment may include data distributed by the Overture Maps Foundation.
+
+Overture source records retain their dataset and license metadata in the database. Depending
+on the monthly release, upstream data may be licensed under CC0-1.0,
+CDLA-Permissive-2.0, or Apache-2.0. Foursquare-derived Overture data is distributed under
+Apache-2.0. See https://docs.overturemaps.org/attribution/ and the stored source metadata
+for the notices applicable to a particular record.
