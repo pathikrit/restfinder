@@ -192,6 +192,8 @@ Checked-in mappings:
 - `data/Megan's List.kmz`: Drinks → `Bars`; Snacks & Desserts → `Coffee Shops`
   or keyword-derived `Dessert`; Good Eats and Fancy Eats → `Restaurant`. All
   other Megan folders are skipped.
+- `data/Zoo Booze Hidden.kmz`: Hidden, Sort of Hidden, and Not Sure →
+  `Hidden / Speakeasy`; reference → `@zoo.booze's Hidden`.
 
 The repository-local `/import-kmz` skill under `.agents/skills/import-kmz/`
 documents the review and import workflow for future maps.
