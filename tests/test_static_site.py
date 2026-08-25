@@ -33,6 +33,14 @@ def test_frontend_registers_pwa_and_native_location_support():
     assert "navigator.geolocation.getCurrentPosition" in html
 
 
+def test_frontend_uses_social_domains_as_reference_labels():
+    html = (ROOT / "index.html").read_text()
+
+    assert "'instagram.com': 'Instagram'" in html
+    assert "'tiktok.com': 'TikTok'" in html
+    assert "`${referenceLabel(value)} ${value}`" in html
+
+
 def test_build_copies_pwa_files():
     makefile = (ROOT / "Makefile").read_text()
 

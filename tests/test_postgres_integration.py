@@ -9,6 +9,11 @@ from restfinder.kmz import KMZPlace, import_places
 from restfinder.legacy import LegacyRestaurant, import_legacy_restaurants
 from restfinder.nyc import Restaurant, upsert_snapshot
 from restfinder.references import ReferenceManifest, import_manifests
+from restfinder.social_video import (
+    fallback_id as social_fallback_id,
+    import_manifest,
+    source_import_status,
+)
 
 
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
@@ -279,6 +284,73 @@ def test_new_fallback_import_does_not_expire_older_fallback():
         "kmz:ricks-list:first",
         "kmz:ricks-list:second",
     ]
+
+
+def test_social_video_import_is_reviewed_synchronized_and_idempotent():
+    now = datetime(2026, 8, 24, tzinfo=timezone.utc)
+    master = row(123, name="Existing Bar")
+    upsert_snapshot([master], connection_url=TEST_DATABASE_URL, observed_at=now)
+    reference = "https://www.instagram.com/p/DcU1FfROXHZ/"
+    fallback_id = social_fallback_id("Secret Bar", 40.75, -73.99)
+    manifest = {
+        "schema_version": 1,
+        "reference": reference,
+        "added_at": "2026-08-24T00:00:00Z",
+        "restaurants": [
+            {"restaurant_id": master.id, "type": "Bars"},
+            {
+                "restaurant_id": fallback_id,
+                "type": "Hidden / Speakeasy",
+                "fallback": {
+                    "name": "Secret Bar",
+                    "address": "1 Secret Street, New York, NY 10001",
+                    "latitude": 40.75,
+                    "longitude": -73.99,
+                },
+            },
+        ],
+    }
+
+    first = import_manifest(manifest, connection_url=TEST_DATABASE_URL)
+    second = import_manifest(manifest, connection_url=TEST_DATABASE_URL)
+
+    assert (first.matched_existing, first.inserted_fallbacks) == (1, 1)
+    assert (first.types_updated, first.references_inserted) == (1, 2)
+    assert (second.inserted_fallbacks, second.updated_fallbacks) == (0, 1)
+    assert (second.types_updated, second.references_inserted) == (0, 0)
+    status = source_import_status(reference, connection_url=TEST_DATABASE_URL)
+    assert status["imported"] is True
+    assert len(status["restaurants"]) == 2
+    with psycopg.connect(TEST_DATABASE_URL) as connection:
+        assert connection.execute(
+            "SELECT type FROM restaurants WHERE id = %s", (master.id,)
+        ).fetchone() == ("Bars",)
+        assert connection.execute(
+            "SELECT source, type FROM restaurants WHERE id = %s", (fallback_id,)
+        ).fetchone() == ("social_video", "Hidden / Speakeasy")
+        assert connection.execute(
+            "SELECT count(*) FROM restaurant_references WHERE reference = %s", (reference,)
+        ).fetchone()[0] == 2
+
+    reduced = {
+        **manifest,
+        "restaurants": [{"restaurant_id": master.id, "type": "Restaurant"}],
+    }
+    synchronized = import_manifest(reduced, connection_url=TEST_DATABASE_URL)
+
+    assert synchronized.references_removed == 1
+    assert synchronized.orphan_fallbacks_removed == 1
+    with psycopg.connect(TEST_DATABASE_URL) as connection:
+        assert connection.execute(
+            "SELECT type FROM restaurants WHERE id = %s", (master.id,)
+        ).fetchone() == ("Bars",)
+        assert connection.execute(
+            "SELECT count(*) FROM restaurants WHERE id = %s", (fallback_id,)
+        ).fetchone()[0] == 0
+        assert connection.execute(
+            "SELECT restaurant_id FROM restaurant_references WHERE reference = %s",
+            (reference,),
+        ).fetchall() == [(master.id,)]
 
 
 def test_legacy_import_uses_master_id_and_tags_atlas_obscura():

@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "reference": "https://www.instagram.com/p/DYyMt4lxhQs/",
+  "added_at": "2026-08-25T01:03:24.520187Z",
+  "restaurants": [
+    {
+      "restaurant_id": "social_video:1e909a103b49683a39ba",
+      "type": "Bars",
+      "fallback": {
+        "name": "The Champagne & Caviar Bar at RH Guesthouse New York",
+        "address": "55 Gansevoort Street, New York, NY 10014",
+        "latitude": 40.739569,
+        "longitude": -74.007111
+      }
+    },
+    {
+      "restaurant_id": "social_video:6184609a6a1e3657a88f",
+      "type": "Bars",
+      "fallback": {
+        "name": "Hudson VU",
+        "address": "653 11th Avenue, New York, NY 10036",
+        "latitude": 40.764576,
+        "longitude": -73.995999
+      }
+    },
+    {
+      "restaurant_id": "nyc_dohmh:50109132",
+      "type": "Restaurant"
+    }
+  ]
+}

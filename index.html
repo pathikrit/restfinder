@@ -474,20 +474,33 @@
       })[character]);
     }
 
+    const referenceLabels = {
+      'instagram.com': 'Instagram',
+      'tiktok.com': 'TikTok',
+      'guide.michelin.com': 'Michelin',
+      'jamesbeard.org': 'James Beard',
+      'ny.itsfound.com': 'Itsfound',
+      'atlasobscura.com': 'Atlas Obscura',
+      'theinfatuation.com': 'Infatuation'
+    };
+
+    function referenceLabel(value) {
+      try {
+        const url = new URL(value);
+        if (url.protocol === 'http:' || url.protocol === 'https:') {
+          const hostname = url.hostname.replace(/^www\./, '').replace(/^archive\./, '').replace(/^web\./, '');
+          return referenceLabels[hostname] || hostname;
+        }
+      } catch (_) {}
+      return value;
+    }
+
     function referenceHtml(item) {
       const value = item.reference || '';
       try {
         const url = new URL(value);
         if (url.protocol === 'http:' || url.protocol === 'https:') {
-          const hostname = url.hostname.replace(/^www\./, '').replace(/^archive\./, '').replace(/^web\./, '');
-          const labels = {
-            'guide.michelin.com': 'Michelin',
-            'jamesbeard.org': 'James Beard',
-            'ny.itsfound.com': 'Itsfound',
-            'atlasobscura.com': 'Atlas Obscura',
-            'theinfatuation.com': 'Infatuation'
-          };
-          const label = labels[hostname] || hostname;
+          const label = referenceLabel(value);
           return `<a class="reference" href="${escapeHtml(url.href)}" target="_blank" rel="noopener">${escapeHtml(label)}</a>`;
         }
       } catch (_) {}
@@ -505,7 +518,10 @@
     }
 
     function referenceSearchText(restaurant) {
-      return (restaurant.references || []).map(item => item.reference || '').join(' ').toLowerCase();
+      return (restaurant.references || []).map(item => {
+        const value = item.reference || '';
+        return `${referenceLabel(value)} ${value}`;
+      }).join(' ').toLowerCase();
     }
 
     function filteredRestaurants() {

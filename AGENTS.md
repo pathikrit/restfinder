@@ -30,12 +30,18 @@ DATABASE_USER=<username>
 DATABASE_PASSWORD=<password>
 DATABASE_URL=postgresql://${DATABASE_USER}:${DATABASE_PASSWORD}@<host>/<database>?sslmode=require
 NYC_OPEN_DATA_APP_TOKEN=
+OPENAI_API_KEY=
+RESTFINDER_VIDEO_MODEL=gpt-5.6-terra
+RESTFINDER_TRANSCRIPTION_MODEL=gpt-transcribe
+RESTFINDER_GEOCODER_URL=https://nominatim.openstreetmap.org/search
 ```
 
 `DATABASE_URL` is required. `NYC_OPEN_DATA_APP_TOKEN` is optional and is sent as
 the Socrata `X-App-Token` header when present. CI can provide a complete
-`DATABASE_URL` directly. Never commit `.env`, live credentials, or generated
-`.site/` output.
+`DATABASE_URL` directly. `OPENAI_API_KEY` is required only for social-video
+analysis; the model and geocoder variables are optional overrides. Never commit
+`.env`, live credentials, generated `.site/` output, or `.restfinder/` drafts
+and geocoding cache.
 
 ## Commands
 
@@ -83,6 +89,40 @@ Checked-in manifests under `imports/` use this shape:
 
 The importer rejects unknown IDs, applies an invocation transactionally, and is
 idempotent.
+
+## Social video imports
+
+The repository-local `/import-ig` skill under `.agents/skills/import-ig/`
+handles Instagram and TikTok restaurant
+recommendation posts. `src/restfinder/social_video.py` first attempts an
+unauthenticated public download; if a platform blocks it, analyze a user-supplied
+media file with its original `--source-url`. Never extract browser cookies for
+this workflow.
+
+Analysis transcribes audio, samples timestamped frames, extracts grounded venue
+mentions with structured OpenAI output, and resolves them against Neon. Matching
+prefers current DOHMH rows, then historical DOHMH rows, then existing external
+fallbacks. Ambiguous canonical matches remain unresolved. Clearly identified
+unmatched NYC venues may become `social_video` fallbacks only after their address
+and coordinates have been reviewed. Public Nominatim use is cached, serialized,
+and limited to one request per second. NYC Planning GeoSearch is the
+authoritative address fallback, followed by bounded Photon search when both are
+unavailable.
+
+Drafts and the geocoding cache live under ignored `.restfinder/`. A selected
+unresolved row blocks import. After explicit approval, the importer writes a
+versioned manifest under `imports/videos/` and applies one database transaction:
+fallback upserts, type upgrades using the existing specificity priority, and an
+exact synchronization of references for that video URL. Repeated imports are
+idempotent. The skill must never run the `import` command or pass `--import-db`
+before the user approves the displayed one-video review. It must not commit or
+push Git changes unless requested.
+
+Before analysis, the skill checks the canonical post URL against
+`restaurant_references.reference` in Neon. If the URL is already present, it
+shows the existing rows and waits for explicit reimport confirmation before
+downloading or using a model. Reimport confirmation does not replace the later
+approval of the newly extracted review table.
 
 ## Legacy mentions
 

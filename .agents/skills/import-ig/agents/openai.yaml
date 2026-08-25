@@ -1,0 +1,7 @@
+interface:
+  display_name: "Import IG"
+  short_description: "Check and review venue posts before Neon import"
+  default_prompt: "Use $import-ig to check and parse this Instagram or TikTok post into reviewed RestFinder entries."
+
+policy:
+  allow_implicit_invocation: true
