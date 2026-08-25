@@ -1,10 +1,14 @@
 const filters = { name: '', type: '', references: '' };
 const markers = new Map();
+let markerLabelMode = false;
 let restaurants = [];
 let selectedRestaurantId = null;
 let map = null;
 let mapsLibraries = null;
 let locationMarker = null;
+let locationPosition = null;
+let GoogleMapClass = null;
+let mapConfiguration = null;
 
 const typeColor = {
   'Restaurant': '#dc2626', 'Bars': '#7c3aed', 'Coffee Shops': '#92400e',
@@ -20,6 +24,82 @@ const referenceLabels = {
   'ny.itsfound.com': 'Itsfound', 'atlasobscura.com': 'Atlas Obscura',
   'theinfatuation.com': 'Infatuation'
 };
+
+const themeMediaQuery = window.matchMedia?.('(prefers-color-scheme: dark)');
+
+function savedTheme() {
+  try {
+    const value = localStorage.getItem('restfinder-theme');
+    return value === 'light' || value === 'dark' ? value : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function currentTheme() {
+  return document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
+}
+
+function updateThemeControl(theme) {
+  const button = document.getElementById('theme-toggle');
+  if (!button) return;
+  const nextTheme = theme === 'dark' ? 'light' : 'dark';
+  button.setAttribute('aria-label', `Switch to ${nextTheme} mode`);
+  button.title = `Switch to ${nextTheme} mode`;
+  button.querySelector('i').className = `fa-solid ${theme === 'dark' ? 'fa-sun' : 'fa-moon'}`;
+}
+
+function createGoogleMap(center, zoom) {
+  if (!GoogleMapClass || !mapConfiguration || !mapsLibraries) return;
+  markers.forEach(marker => { marker.map = null; });
+  markers.clear();
+  if (locationMarker) locationMarker.map = null;
+
+  const mapElement = document.getElementById('map');
+  mapElement.replaceChildren();
+  map = new GoogleMapClass(mapElement, {
+    center,
+    zoom,
+    mapId: mapConfiguration.google_map_id || 'DEMO_MAP_ID',
+    colorScheme: currentTheme() === 'light' ? mapsLibraries.ColorScheme.LIGHT : mapsLibraries.ColorScheme.DARK,
+    mapTypeControl: false,
+    streetViewControl: false,
+    fullscreenControl: false
+  });
+  map.addListener('idle', renderAll);
+  if (locationPosition) {
+    locationMarker = new mapsLibraries.AdvancedMarkerElement({
+      map, position: locationPosition, title: 'Your current location'
+    });
+  } else {
+    locationMarker = null;
+  }
+  renderAll();
+}
+
+function applyTheme(theme, remember = false) {
+  document.documentElement.dataset.theme = theme;
+  document.querySelector('meta[name="theme-color"]').content = theme === 'light' ? '#ffffff' : '#111827';
+  updateThemeControl(theme);
+  if (remember) {
+    try { localStorage.setItem('restfinder-theme', theme); } catch (_) {}
+  }
+  if (map) {
+    const center = map.getCenter()?.toJSON();
+    const zoom = map.getZoom();
+    if (center && zoom != null) createGoogleMap(center, zoom);
+  }
+}
+
+function configureTheme() {
+  updateThemeControl(currentTheme());
+  document.getElementById('theme-toggle').addEventListener('click', () => {
+    applyTheme(currentTheme() === 'dark' ? 'light' : 'dark', true);
+  });
+  themeMediaQuery?.addEventListener('change', event => {
+    if (!savedTheme()) applyTheme(event.matches ? 'dark' : 'light');
+  });
+}
 
 function escapeHtml(value) {
   return String(value == null ? '' : value).replace(/[&<>"']/g, character => ({
@@ -177,7 +257,7 @@ function renderTable() {
     wrap.innerHTML = '<div class="empty">No referenced restaurants have been published yet.</div>';
     return;
   }
-  let html = `<table><thead><tr><th>#</th><th>Name${filterInput('name')}</th><th>Type${filterInput('type')}</th><th>Mentions${filterInput('references')}</th></tr></thead><tbody>`;
+  let html = `<table><thead><tr><th>#<span id="status" class="status">${restaurants.length} places</span></th><th>Name${filterInput('name')}</th><th>Type${filterInput('type')}</th><th>Mentions${filterInput('references')}</th></tr></thead><tbody>`;
   visible.forEach((restaurant, index) => {
     html += `<tr class="${restaurant.id === selectedRestaurantId ? 'selected' : ''}" data-id="${escapeHtml(restaurant.id)}"><td>${index + 1}</td><td title="${escapeHtml(restaurant.name)}"><span class="restaurant-name">${escapeHtml(restaurant.name)}</span><a class="map-link" href="${googleMapsUrl(restaurant)}" target="_blank" rel="noopener" aria-label="Open ${escapeHtml(restaurant.name)} in Google Maps"><i class="fa-solid fa-arrow-up-right-from-square"></i></a></td><td>${escapeHtml(restaurant.type || 'Unclassified')}</td><td>${referencesHtml(restaurant.references)}</td></tr>`;
   });
@@ -196,6 +276,12 @@ function renderTable() {
 function renderMarkers() {
   if (!map || !mapsLibraries) return;
   const visible = filteredRestaurants();
+  const showLabels = visible.length < 50;
+  if (showLabels !== markerLabelMode) {
+    markers.forEach(marker => { marker.map = null; });
+    markers.clear();
+    markerLabelMode = showLabels;
+  }
   const visibleIds = new Set(visible.map(restaurant => restaurant.id));
   markers.forEach((marker, id) => {
     if (!visibleIds.has(id)) { marker.map = null; markers.delete(id); }
@@ -205,7 +291,7 @@ function renderMarkers() {
     const marker = new mapsLibraries.AdvancedMarkerElement({
       map,
       position: { lat: restaurant.lat, lng: restaurant.lon },
-      content: markerContent(restaurant, visible.length <= 10),
+      content: markerContent(restaurant, showLabels),
       title: `${restaurant.type || 'Unclassified'}: ${restaurant.name}`
     });
     marker.addListener('click', () => showDetails(restaurant));
@@ -237,8 +323,9 @@ function configureLocation() {
     navigator.geolocation.getCurrentPosition(position => {
       const { latitude, longitude } = position.coords;
       if (locationMarker) locationMarker.map = null;
+      locationPosition = { lat: latitude, lng: longitude };
       locationMarker = new mapsLibraries.AdvancedMarkerElement({
-        map, position: { lat: latitude, lng: longitude }, title: 'Your current location'
+        map, position: locationPosition, title: 'Your current location'
       });
       map.panTo({ lat: latitude, lng: longitude });
       map.setZoom(18);
@@ -277,23 +364,16 @@ async function initializeMap(config, city) {
     return;
   }
   await loadGoogleMaps(config.google_maps_browser_key);
-  const [{ Map: GoogleMap }, { AdvancedMarkerElement }, { PlaceAutocompleteElement }] = await Promise.all([
+  const [{ Map: GoogleMap }, { AdvancedMarkerElement }, { PlaceAutocompleteElement }, { ColorScheme }] = await Promise.all([
     google.maps.importLibrary('maps'),
     google.maps.importLibrary('marker'),
-    google.maps.importLibrary('places')
+    google.maps.importLibrary('places'),
+    google.maps.importLibrary('core')
   ]);
-  mapsLibraries = { AdvancedMarkerElement, PlaceAutocompleteElement };
-  mapElement.innerHTML = '';
-  map = new GoogleMap(mapElement, {
-    center: { lat: city.lat, lng: city.lng },
-    zoom: city.zoom,
-    mapId: config.google_map_id || 'DEMO_MAP_ID',
-    colorScheme: 'DARK',
-    mapTypeControl: false,
-    streetViewControl: false,
-    fullscreenControl: false
-  });
-  map.addListener('idle', renderAll);
+  GoogleMapClass = GoogleMap;
+  mapConfiguration = config;
+  mapsLibraries = { AdvancedMarkerElement, PlaceAutocompleteElement, ColorScheme };
+  createGoogleMap({ lat: city.lat, lng: city.lng }, city.zoom);
 
   const autocomplete = new PlaceAutocompleteElement();
   autocomplete.includedRegionCodes = ['us'];
@@ -315,6 +395,7 @@ async function initializeMap(config, city) {
 }
 
 async function start() {
+  configureTheme();
   configureLocation();
   try {
     const json = response => response.ok ? response.json() : Promise.reject(new Error(`Could not load ${response.url}`));
@@ -329,12 +410,14 @@ async function start() {
     const updated = latest ? new Date(latest).toLocaleDateString('en-GB', {
       day: '2-digit', month: 'short', year: '2-digit', timeZone: 'UTC'
     }).replace(/ /g, '-') : '';
-    document.getElementById('status').innerHTML = `${restaurants.length} places${updated ? ` · Updated <a href="${escapeHtml(build.url)}" target="_blank" rel="noopener">${updated}</a>` : ''}`;
+    document.getElementById('version').innerHTML = updated
+      ? `Updated <a href="${escapeHtml(build.url)}" target="_blank" rel="noopener">${updated}</a>`
+      : '';
     renderTable();
     await initializeMap(config, cities.find(item => item.key === 'nyc'));
   } catch (error) {
     console.error(error);
-    document.getElementById('status').textContent = 'Unable to load map';
+    document.getElementById('version').textContent = 'Unable to load map';
     if (!restaurants.length) {
       document.getElementById('table-wrap').innerHTML = '<div class="empty">Restaurant data could not be loaded.</div>';
     }

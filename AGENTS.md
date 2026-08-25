@@ -54,6 +54,9 @@ published in `.site/config.json` by design and must be restricted by HTTPS
 referrer and API. `GOOGLE_MAP_ID` is required for production advanced markers.
 The monthly Google request ceiling defaults to 4,500 across reruns. An optional
 Overture release pins enrichment; otherwise the latest STAC release is used.
+The dark and light label-filtering styles checked into `data/google-map-style.json`
+and `data/google-map-style-light.json` must be published in Google Cloud and
+associated with the matching modes of that map ID.
 Each monthly Google pass considers only exportable restaurants, skips rows
 already checked that month, processes never-checked rows first, and then uses
 the remaining allowance for the least recently checked rows.

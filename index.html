@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#111827">
+  <meta name="color-scheme" content="dark light">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="RestFinder">
@@ -12,7 +13,19 @@
   <link rel="icon" href="assets/icons/app-icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css">
-  <link rel="stylesheet" href="assets/app.css?v=3">
+  <script>
+    (() => {
+      let theme = 'dark';
+      try {
+        const saved = localStorage.getItem('restfinder-theme');
+        theme = saved === 'light' || saved === 'dark'
+          ? saved
+          : (window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+      } catch (_) {}
+      document.documentElement.dataset.theme = theme;
+    })();
+  </script>
+  <link rel="stylesheet" href="assets/app.css?v=11">
 </head>
 <body>
   <header>
@@ -22,7 +35,10 @@
       <button id="locate-me" class="locate-button" type="button" aria-label="Use my current location" title="Use my current location"><i class="fa-solid fa-location-crosshairs" aria-hidden="true"></i></button>
       <span id="address-search-status" class="sr-only" aria-live="polite"></span>
     </div>
-    <span id="status" class="status">Loading…</span>
+    <div class="header-meta">
+      <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Switch color theme" title="Switch color theme"><i class="fa-solid fa-sun" aria-hidden="true"></i></button>
+      <span id="version" class="version">Loading…</span>
+    </div>
   </header>
   <section class="map-shell">
     <main id="map" aria-label="Restaurant map"><div class="map-message">Loading map…</div></main>
@@ -33,6 +49,6 @@
     </nav>
   </section>
   <section id="table-wrap" aria-live="polite"><div class="empty">Loading restaurants…</div></section>
-  <script type="module" src="assets/app.js?v=3"></script>
+  <script type="module" src="assets/app.js?v=11"></script>
 </body>
 </html>

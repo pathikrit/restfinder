@@ -52,7 +52,8 @@ def test_frontend_uses_google_maps_and_live_place_details():
     assert "maps.googleapis.com/maps/api/js" in javascript
     assert "AdvancedMarkerElement" in javascript
     assert "PlaceAutocompleteElement" in javascript
-    assert "colorScheme: 'DARK'" in javascript
+    assert "ColorScheme.LIGHT" in javascript
+    assert "ColorScheme.DARK" in javascript
     assert "gmp-place-opening-hours" in javascript
     assert "gmp-place-price" in javascript
     assert "gmp-place-open-now-status" in javascript
@@ -60,6 +61,21 @@ def test_frontend_uses_google_maps_and_live_place_details():
     assert ">Open in Maps</a>" in javascript
     assert "RestFinder details" not in javascript
     assert "restaurant.google_place_id ? mentionMetadata" in javascript
+    assert "const showLabels = visible.length < 50" in javascript
+    assert "showLabels !== markerLabelMode" in javascript
+
+
+def test_frontend_theme_switches_app_and_map_and_remembers_choice():
+    html = (ROOT / "index.html").read_text()
+    javascript = (ROOT / "assets/app.js").read_text()
+
+    assert 'id="theme-toggle"' in html
+    assert 'id="version"' in html
+    assert 'id="status" class="status">${restaurants.length} places</span>' in javascript
+    assert html.index('<h1>') < html.index('id="address-search"') < html.index('id="theme-toggle"') < html.index('id="version"')
+    assert "prefers-color-scheme: light" in html
+    assert "localStorage.setItem('restfinder-theme', theme)" in javascript
+    assert "createGoogleMap(center, zoom)" in javascript
 
 
 def test_build_copies_pwa_files():
