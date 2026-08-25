@@ -198,5 +198,7 @@ documents the review and import workflow for future maps.
 `.github/workflows/deploy.yml` tests pushes and pull requests against PostgreSQL.
 Pushes to `main` export Neon and deploy GitHub Pages. The monthly schedule and
 manual dispatch also refresh DOHMH before export. Checked-in one-time imports
-are not replayed. `DATABASE_URL` is the required repository secret;
-`NYC_OPEN_DATA_APP_TOKEN` is optional.
+are not replayed. Deploys require the `DATABASE_URL`,
+`GOOGLE_PLACES_SERVER_KEY`, `GOOGLE_MAPS_BROWSER_KEY`, and `GOOGLE_MAP_ID`
+GitHub Actions secrets. The workflow fails at preflight when any required value
+is absent. `NYC_OPEN_DATA_APP_TOKEN` is optional.

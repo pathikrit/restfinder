@@ -58,10 +58,29 @@ jobs:
       NYC_OPEN_DATA_APP_TOKEN: ${{ secrets.NYC_OPEN_DATA_APP_TOKEN }}
       GOOGLE_PLACES_SERVER_KEY: ${{ secrets.GOOGLE_PLACES_SERVER_KEY }}
       GOOGLE_MAPS_BROWSER_KEY: ${{ secrets.GOOGLE_MAPS_BROWSER_KEY }}
-      GOOGLE_MAP_ID: ${{ vars.GOOGLE_MAP_ID }}
+      GOOGLE_MAP_ID: ${{ secrets.GOOGLE_MAP_ID }}
       GOOGLE_PLACES_MONTHLY_LIMIT: "4500"
     steps:
       - uses: actions/checkout@v4
+      - name: Validate deployment configuration
+        shell: bash
+        run: |
+          missing=()
+          for name in \
+            DATABASE_URL \
+            GOOGLE_PLACES_SERVER_KEY \
+            GOOGLE_MAPS_BROWSER_KEY \
+            GOOGLE_MAP_ID
+          do
+            if [[ -z "${!name:-}" ]]; then
+              missing+=("$name")
+            fi
+          done
+
+          if (( ${#missing[@]} )); then
+            printf '::error::Missing required deployment configuration: %s\n' "$(IFS=', '; echo "${missing[*]}")"
+            exit 1
+          fi
       - uses: astral-sh/setup-uv@v6
         with:
           version: "0.9.26"
