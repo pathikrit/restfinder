@@ -337,10 +337,14 @@ def import_places(
         with connection.cursor() as cursor:
             cursor.execute(
                 """
-                SELECT id, name, latitude, longitude, source
-                FROM restaurants
-                WHERE latitude IS NOT NULL
-                  AND longitude IS NOT NULL
+                SELECT restaurant.id, restaurant.name, restaurant.latitude,
+                       restaurant.longitude, restaurant.source
+                FROM restaurants restaurant
+                LEFT JOIN restaurant_aliases alias
+                  ON alias.alias_restaurant_id = restaurant.id
+                WHERE restaurant.latitude IS NOT NULL
+                  AND restaurant.longitude IS NOT NULL
+                  AND alias.alias_restaurant_id IS NULL
                 """
             )
             existing_rows = cursor.fetchall()
@@ -410,6 +414,14 @@ def import_places(
                             name_counts[normalize_name(place.name)] > 5,
                         )
                     )
+            cursor.execute(
+                """
+                UPDATE incoming_kmz_restaurants incoming
+                SET restaurant_id = alias.canonical_restaurant_id
+                FROM restaurant_aliases alias
+                WHERE alias.alias_restaurant_id = incoming.source_id
+                """
+            )
             cursor.execute(
                 """
                 SELECT count(*)
@@ -484,6 +496,10 @@ def import_places(
                 WHERE restaurant.id = incoming.source_id
                   AND incoming.restaurant_id <> incoming.source_id
                   AND restaurant.source = %s
+                  AND NOT EXISTS (
+                      SELECT 1 FROM restaurant_aliases alias
+                      WHERE alias.alias_restaurant_id = restaurant.id
+                  )
                 """,
                 (source,),
             )
@@ -498,6 +514,10 @@ def import_places(
                     DELETE FROM restaurants
                     WHERE source = %s
                       AND id = ANY(%s)
+                      AND NOT EXISTS (
+                          SELECT 1 FROM restaurant_aliases alias
+                          WHERE alias.alias_restaurant_id = restaurants.id
+                      )
                     """,
                     (source, duplicate_source_ids),
                 )

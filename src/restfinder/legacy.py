@@ -181,7 +181,16 @@ def import_legacy_restaurants(
 
     with psycopg.connect(connection_url) as connection:
         with connection.cursor() as cursor:
-            cursor.execute("SELECT id, name, latitude, longitude, source FROM restaurants")
+            cursor.execute(
+                """
+                SELECT restaurant.id, restaurant.name, restaurant.latitude,
+                       restaurant.longitude, restaurant.source
+                FROM restaurants restaurant
+                LEFT JOIN restaurant_aliases alias
+                  ON alias.alias_restaurant_id = restaurant.id
+                WHERE alias.alias_restaurant_id IS NULL
+                """
+            )
             matches, direct, ambiguous = match_legacy_restaurants(
                 restaurants,
                 cursor.fetchall(),
@@ -227,6 +236,14 @@ def import_legacy_restaurants(
                             restaurant.is_atlas_obscura,
                         )
                     )
+            cursor.execute(
+                """
+                UPDATE incoming_legacy_restaurants incoming
+                SET restaurant_id = alias.canonical_restaurant_id
+                FROM restaurant_aliases alias
+                WHERE alias.alias_restaurant_id = incoming.fallback_id
+                """
+            )
             cursor.execute(
                 """
                 SELECT count(*)
@@ -296,6 +313,10 @@ def import_legacy_restaurants(
                 WHERE restaurant.id = incoming.fallback_id
                   AND incoming.restaurant_id <> incoming.fallback_id
                   AND restaurant.source = %s
+                  AND NOT EXISTS (
+                      SELECT 1 FROM restaurant_aliases alias
+                      WHERE alias.alias_restaurant_id = restaurant.id
+                  )
                 """,
                 (SOURCE,),
             )

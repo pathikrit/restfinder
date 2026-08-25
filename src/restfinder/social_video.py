@@ -626,8 +626,12 @@ def load_database_restaurants(*, connection_url: str) -> list[DatabaseRestaurant
                         FROM restaurants
                         WHERE source = 'nyc_dohmh'
                     ) AS current_dohmh
-            FROM restaurants
-            WHERE latitude IS NOT NULL AND longitude IS NOT NULL
+            FROM restaurants restaurant
+            LEFT JOIN restaurant_aliases alias
+              ON alias.alias_restaurant_id = restaurant.id
+            WHERE restaurant.latitude IS NOT NULL
+              AND restaurant.longitude IS NOT NULL
+              AND alias.alias_restaurant_id IS NULL
             """
         ).fetchall()
     return [
@@ -1383,8 +1387,25 @@ def import_manifest(payload: dict[str, Any], *, connection_url: str) -> ImportRe
                     ),
                 )
 
+            cursor.execute(
+                """
+                SELECT restaurant.id,
+                       coalesce(alias.canonical_restaurant_id, restaurant.id)
+                FROM restaurants restaurant
+                LEFT JOIN restaurant_aliases alias
+                  ON alias.alias_restaurant_id = restaurant.id
+                WHERE restaurant.id = ANY(%s)
+                """,
+                (requested_ids,),
+            )
+            resolved_ids = dict(cursor.fetchall())
+            resolved_item_ids = [
+                resolved_ids.get(identifier, identifier) for identifier in requested_ids
+            ]
+            requested_ids = list(dict.fromkeys(resolved_item_ids))
+
             types_updated = 0
-            for item in items:
+            for item, resolved_id in zip(items, resolved_item_ids, strict=True):
                 cursor.execute(
                     """
                     UPDATE restaurants
@@ -1404,7 +1425,7 @@ def import_manifest(payload: dict[str, Any], *, connection_url: str) -> ImportRe
                       )
                     """,
                     {
-                        "id": item["restaurant_id"],
+                        "id": resolved_id,
                         "type": item["type"],
                         "priority": TYPE_PRIORITY[item["type"]],
                     },
@@ -1460,6 +1481,10 @@ def import_manifest(payload: dict[str, Any], *, connection_url: str) -> ImportRe
                       AND NOT EXISTS (
                           SELECT 1 FROM restaurant_references reference
                           WHERE reference.restaurant_id = restaurant.id
+                      )
+                      AND NOT EXISTS (
+                          SELECT 1 FROM restaurant_aliases alias
+                          WHERE alias.alias_restaurant_id = restaurant.id
                       )
                     """,
                     (SOCIAL_SOURCE, orphan_candidates),

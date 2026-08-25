@@ -1,9 +1,11 @@
-from datetime import datetime, timedelta, timezone
 import os
+from datetime import datetime, timedelta, timezone
 
 import psycopg
 import pytest
 
+from restfinder.duplicates import merge_restaurant
+from restfinder.enrichment import ProviderMatch, ProviderPlace, upsert_enrichment
 from restfinder.export import export_rows
 from restfinder.kmz import KMZPlace, import_places
 from restfinder.legacy import LegacyRestaurant, import_legacy_restaurants
@@ -39,10 +41,128 @@ def clean_database():
     if TEST_DATABASE_URL and "test" not in TEST_DATABASE_URL:
         pytest.fail("TEST_DATABASE_URL must point to a visibly named test database")
     with psycopg.connect(TEST_DATABASE_URL) as connection:
-        connection.execute("TRUNCATE restaurant_references, restaurants")
+        connection.execute(
+            "TRUNCATE enrichment_runs, restaurant_enrichments, restaurant_aliases, "
+            "restaurant_references, restaurants RESTART IDENTITY"
+        )
     yield
     with psycopg.connect(TEST_DATABASE_URL) as connection:
-        connection.execute("TRUNCATE restaurant_references, restaurants")
+        connection.execute(
+            "TRUNCATE enrichment_runs, restaurant_enrichments, restaurant_aliases, "
+            "restaurant_references, restaurants RESTART IDENTITY"
+        )
+
+
+def test_overture_fills_missing_export_fields_without_overwriting_canonical():
+    now = datetime(2026, 8, 25, tzinfo=timezone.utc)
+    restaurant = row(77)
+    restaurant = Restaurant(
+        id=restaurant.id,
+        source=restaurant.source,
+        name=restaurant.name,
+        cuisine=None,
+        address=None,
+        phone=None,
+        latitude=restaurant.latitude,
+        longitude=restaurant.longitude,
+        is_chain=False,
+    )
+    upsert_snapshot([restaurant], connection_url=TEST_DATABASE_URL, observed_at=now)
+    import_manifests(
+        [ReferenceManifest("A list", now, (restaurant.id,))],
+        connection_url=TEST_DATABASE_URL,
+    )
+    place = ProviderPlace(
+        id="overture-id",
+        name=restaurant.name,
+        address="77 Test Street, New York, NY",
+        latitude=restaurant.latitude,
+        longitude=restaurant.longitude,
+        primary_category="korean_restaurant",
+        category_hierarchy=("food_and_drink", "restaurant", "korean_restaurant"),
+        operating_status="open",
+        phones=("+12125550177",),
+        websites=("https://example.test",),
+    )
+    with psycopg.connect(TEST_DATABASE_URL) as connection:
+        upsert_enrichment(
+            connection,
+            restaurant_id=restaurant.id,
+            provider="overture",
+            match=ProviderMatch("matched", place, "exact_name_nearby", 1.0),
+            checked_at=now,
+            provider_release="2026-08-19.0",
+        )
+
+    exported = export_rows(connection_url=TEST_DATABASE_URL)[0]
+    assert exported["cuisine"] == "Korean"
+    assert exported["address"] == "77 Test Street, New York, NY"
+    assert exported["phone"] == "+12125550177"
+    assert exported["website"] == "https://example.test"
+    assert exported["operating_status"] == "open"
+    assert exported["detail_sources"]["cuisine"] == "overture"
+
+
+def test_reviewed_merge_moves_references_and_hides_alias():
+    now = datetime(2026, 8, 25, tzinfo=timezone.utc)
+    upsert_snapshot([row(1), row(2)], connection_url=TEST_DATABASE_URL, observed_at=now)
+    import_manifests(
+        [ReferenceManifest("First", now, ("nyc_dohmh:1",)), ReferenceManifest("Second", now, ("nyc_dohmh:2",))],
+        connection_url=TEST_DATABASE_URL,
+    )
+    with psycopg.connect(TEST_DATABASE_URL) as connection:
+        merge_restaurant(
+            connection,
+            alias_id="nyc_dohmh:2",
+            canonical_id="nyc_dohmh:1",
+            reviewed_at=now,
+            reason="Reviewed duplicate",
+        )
+
+    exported = export_rows(connection_url=TEST_DATABASE_URL)
+    assert [item["id"] for item in exported] == ["nyc_dohmh:1"]
+    assert {item["reference"] for item in exported[0]["references"]} == {"First", "Second"}
+
+
+def test_google_enrichment_persists_only_place_id_and_match_metadata():
+    now = datetime(2026, 8, 25, tzinfo=timezone.utc)
+    restaurant = row(88)
+    upsert_snapshot([restaurant], connection_url=TEST_DATABASE_URL, observed_at=now)
+    import_manifests(
+        [ReferenceManifest("A list", now, (restaurant.id,))],
+        connection_url=TEST_DATABASE_URL,
+    )
+    transient_google_place = ProviderPlace(
+        id="google-place-id",
+        name="Google-provided name",
+        address="Google-provided address",
+        latitude=restaurant.latitude,
+        longitude=restaurant.longitude,
+        primary_category="restaurant",
+        phones=("+12125550188",),
+        websites=("https://google-content.invalid",),
+    )
+    with psycopg.connect(TEST_DATABASE_URL) as connection:
+        upsert_enrichment(
+            connection,
+            restaurant_id=restaurant.id,
+            provider="google_places",
+            match=ProviderMatch("matched", transient_google_place, "exact_name_nearby", 1.0),
+            checked_at=now,
+        )
+        stored = connection.execute(
+            """
+            SELECT provider_place_id, primary_category, address, phones, websites
+            FROM restaurant_enrichments
+            WHERE restaurant_id = %s AND provider = 'google_places'
+            """,
+            (restaurant.id,),
+        ).fetchone()
+
+    assert stored == ("google-place-id", None, None, None, None)
+    exported = export_rows(connection_url=TEST_DATABASE_URL)[0]
+    assert exported["google_place_id"] == "google-place-id"
+    assert "Google-provided" not in str(exported)
 
 
 def test_upsert_import_and_curated_export():

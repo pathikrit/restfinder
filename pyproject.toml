@@ -5,6 +5,7 @@ requires-python = "===3.13.2"
 dependencies = [
     "alembic==1.19.1",
     "av==18.1.0",
+    "duckdb==1.4.3",
     "openai==3.3.1",
     "pillow==12.3.0",
     "psycopg[binary]==3.3.4",

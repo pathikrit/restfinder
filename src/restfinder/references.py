@@ -73,13 +73,24 @@ def import_manifests(manifests: Iterable[ReferenceManifest], *, connection_url: 
     with psycopg.connect(connection_url) as connection:
         with connection.cursor() as cursor:
             cursor.execute(
-                "SELECT id FROM restaurants WHERE id = ANY(%s)",
+                """
+                SELECT restaurant.id, coalesce(alias.canonical_restaurant_id, restaurant.id)
+                FROM restaurants restaurant
+                LEFT JOIN restaurant_aliases alias
+                  ON alias.alias_restaurant_id = restaurant.id
+                WHERE restaurant.id = ANY(%s)
+                """,
                 (requested_ids,),
             )
-            existing_ids = {row[0] for row in cursor.fetchall()}
+            resolved_ids = dict(cursor.fetchall())
+            existing_ids = set(resolved_ids)
             missing = sorted(set(requested_ids) - existing_ids)
             if missing:
                 raise ValueError(f"Unknown restaurant IDs: {', '.join(missing)}")
+            rows = [
+                (resolved_ids[restaurant_id], reference, added_at)
+                for restaurant_id, reference, added_at in rows
+            ]
             cursor.executemany(
                 """
                 INSERT INTO restaurant_references (restaurant_id, reference, added_at)
