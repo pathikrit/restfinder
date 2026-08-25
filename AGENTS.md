@@ -31,6 +31,12 @@ DATABASE_PASSWORD=<password>
 DATABASE_URL=postgresql://${DATABASE_USER}:${DATABASE_PASSWORD}@<host>/<database>?sslmode=require
 NYC_OPEN_DATA_APP_TOKEN=
 OPENAI_API_KEY=
+GOOGLE_PLACES_SERVER_KEY=
+GOOGLE_MAPS_BROWSER_KEY=
+GOOGLE_MAP_ID=
+GOOGLE_MAP_STYLE_ID=
+GOOGLE_PLACES_MONTHLY_LIMIT=4500
+OVERTURE_RELEASE=
 RESTFINDER_VIDEO_MODEL=gpt-5.6-terra
 RESTFINDER_TRANSCRIPTION_MODEL=gpt-transcribe
 RESTFINDER_GEOCODER_URL=https://nominatim.openstreetmap.org/search
@@ -43,11 +49,22 @@ analysis; the model and geocoder variables are optional overrides. Never commit
 `.env`, live credentials, generated `.site/` output, or `.restfinder/` drafts
 and geocoding cache.
 
+`GOOGLE_PLACES_SERVER_KEY` is the secret batch-matching key. The browser key is
+published in `.site/config.json` by design and must be restricted by HTTPS
+referrer and API. `GOOGLE_MAP_ID` is required for production advanced markers.
+The monthly Google request ceiling defaults to 4,500 across reruns. An optional
+Overture release pins enrichment; otherwise the latest STAC release is used.
+Each monthly Google pass considers only exportable restaurants, skips rows
+already checked that month, processes never-checked rows first, and then uses
+the remaining allowance for the least recently checked rows.
+
 ## Commands
 
 | Command | Purpose |
 | --- | --- |
 | `make fetch` | Fetch and upsert the current DOHMH snapshot |
+| `make enrich` | Refresh Overture data and fill the Google Place ID backlog |
+| `make duplicates` | Write an ignored duplicate review draft |
 | `make build` | Export data and assemble the static site |
 | `make dev` | Export data and serve source frontend files on port 8080 |
 | `make test` | Run unit and PostgreSQL integration tests |
@@ -56,6 +73,24 @@ The Makefile intentionally covers only recurring development and deployment.
 One-time imports are run explicitly through their modules in `src/restfinder/`;
 their source snapshots stay checked in under `data/` or `imports/` and are never
 replayed automatically by CI.
+
+## Place enrichment
+
+`restaurant_enrichments` stores one provider result per restaurant. Overture
+fields may be persisted and are used only when canonical fields are missing.
+Google rows contain Place IDs and match metadata only; hours, price, and
+open-now are rendered live with Places UI Kit and must never enter exports,
+caches, logs, or drafts. `last_checked_at` is provider-specific.
+
+Matching automatically accepts only a unique exact nearby name or a strong
+address-confirmed fuzzy match. Ambiguous matches remain unresolved. Overture's
+general `operating_status` never directly marks a restaurant closed.
+
+Duplicate preparation writes `.restfinder/duplicate-review.json`. Each reviewed
+pair is recorded as merge, keep-separate, or defer in a manifest under
+`imports/merges/`; only explicit merge decisions create `restaurant_aliases`.
+Aliases remain auditable, references are moved to their canonical restaurant,
+and the exporter excludes alias rows.
 
 ## DOHMH ingestion
 

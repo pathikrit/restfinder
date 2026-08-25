@@ -56,6 +56,10 @@ jobs:
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       NYC_OPEN_DATA_APP_TOKEN: ${{ secrets.NYC_OPEN_DATA_APP_TOKEN }}
+      GOOGLE_PLACES_SERVER_KEY: ${{ secrets.GOOGLE_PLACES_SERVER_KEY }}
+      GOOGLE_MAPS_BROWSER_KEY: ${{ secrets.GOOGLE_MAPS_BROWSER_KEY }}
+      GOOGLE_MAP_ID: ${{ vars.GOOGLE_MAP_ID }}
+      GOOGLE_PLACES_MONTHLY_LIMIT: "4500"
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
@@ -65,6 +69,8 @@ jobs:
       - run: uv sync --locked
       - if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
         run: make fetch
+      - if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        run: make enrich
       - run: make build
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

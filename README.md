@@ -2,12 +2,10 @@
 
 [![Test and deploy](https://github.com/pathikrit/restfinder/actions/workflows/deploy.yml/badge.svg)](https://github.com/pathikrit/restfinder/actions/workflows/deploy.yml)
 
-A curated map of NYC restaurants recommended by Rick's List, Michelin, James
-Beard, Atlas Obscura, Itsfound, and The Infatuation. NYC DOHMH is the canonical
-restaurant source, Neon stores restaurants and their references, and GitHub
-Pages serves a static export. The Python data pipeline lives in
-`src/restfinder/`, migrations in `migrations/`, source snapshots in `data/`, and
-the frontend in `index.html`.
+A curated Google map of NYC restaurants recommended by Rick's List, Michelin,
+James Beard, Atlas Obscura, Itsfound, and The Infatuation. NYC DOHMH is the
+canonical restaurant source, Overture fills persistable missing details, Neon
+stores the data, and Google supplies live place details when selected.
 
 ## Development
 
@@ -23,6 +21,8 @@ make dev             # serve http://localhost:8080; refresh after frontend edits
 | --- | --- |
 | `make test` | Run the test suite |
 | `make fetch` | Refresh the NYC DOHMH data |
+| `make enrich` | Refresh Overture details and the Google ID backlog |
+| `make duplicates` | Prepare the reviewed duplicate report |
 | `make build` | Generate the static site |
 
 ## Importing social recommendations

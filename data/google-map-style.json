@@ -1,0 +1,47 @@
+{
+  "variant": "dark",
+  "styles": [
+    {
+      "id": "pointOfInterest",
+      "label": {
+        "visible": false
+      }
+    },
+    {
+      "id": "pointOfInterest.recreation.park",
+      "label": {
+        "visible": true
+      }
+    },
+    {
+      "id": "political",
+      "label": {
+        "visible": false
+      }
+    },
+    {
+      "id": "infrastructure",
+      "label": {
+        "visible": false
+      }
+    },
+    {
+      "id": "infrastructure.roadNetwork.road",
+      "label": {
+        "visible": true
+      }
+    },
+    {
+      "id": "infrastructure.railwayTrack",
+      "geometry": {
+        "visible": false
+      }
+    },
+    {
+      "id": "infrastructure.transitStation",
+      "label": {
+        "visible": false
+      }
+    }
+  ]
+}
