@@ -243,7 +243,6 @@ function selectRestaurant(id) {
   const restaurant = restaurants.find(item => item.id === id);
   if (!restaurant) return;
   showDetails(restaurant);
-  if (map) { map.panTo({ lat: restaurant.lat, lng: restaurant.lon }); map.setZoom(18); }
 }
 
 function filterInput(key) {

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'restfinder-v11';
+const CACHE_NAME = 'restfinder-v12';
 const APP_SHELL = [
   './',
   './index.html',
@@ -7,8 +7,8 @@ const APP_SHELL = [
   './privacy.html',
   './terms.html',
   './NOTICE',
-  './assets/app.css?v=11',
-  './assets/app.js?v=11',
+  './assets/app.css?v=12',
+  './assets/app.js?v=12',
   './assets/icons/app-icon.svg',
   './assets/icons/app-icon-192.png',
   './assets/icons/app-icon-512.png',

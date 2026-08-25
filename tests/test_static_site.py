@@ -78,6 +78,17 @@ def test_frontend_theme_switches_app_and_map_and_remembers_choice():
     assert "createGoogleMap(center, zoom)" in javascript
 
 
+def test_table_selection_does_not_move_the_map_and_reorder_rows():
+    javascript = (ROOT / "assets/app.js").read_text()
+    selection = javascript.split("function selectRestaurant(id) {", maxsplit=1)[1].split(
+        "function filterInput", maxsplit=1
+    )[0]
+
+    assert "showDetails(restaurant)" in selection
+    assert "map.panTo" not in selection
+    assert "map.setZoom" not in selection
+
+
 def test_build_copies_pwa_files():
     makefile = (ROOT / "Makefile").read_text()
 
