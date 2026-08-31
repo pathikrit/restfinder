@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "reference": "https://www.instagram.com/reel/DYCUbXygJ5U/",
+  "added_at": "2026-08-31T18:13:12.610438Z",
+  "restaurants": [
+    {
+      "restaurant_id": "social_video:c62d7d6b23fe18bd79c0",
+      "type": "Bars",
+      "fallback": {
+        "name": "Highball Ltd",
+        "address": "10 Grand Central, 11th Floor, New York, NY 10017",
+        "latitude": 40.752421,
+        "longitude": -73.973761
+      }
+    }
+  ]
+}

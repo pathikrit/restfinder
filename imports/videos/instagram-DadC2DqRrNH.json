@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "reference": "https://www.instagram.com/reel/DadC2DqRrNH/",
+  "added_at": "2026-08-31T18:13:39.430645Z",
+  "restaurants": [
+    {
+      "restaurant_id": "social_video:62fcb9a747754d799257",
+      "type": "Restaurant",
+      "fallback": {
+        "name": "Mūje",
+        "address": "151 W 30th Street, New York, NY 10001",
+        "latitude": 40.748441,
+        "longitude": -73.99182
+      }
+    }
+  ]
+}

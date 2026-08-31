@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "reference": "https://www.instagram.com/reel/DZFyMSfi835/",
+  "added_at": "2026-08-31T18:13:37.942154Z",
+  "restaurants": [
+    {
+      "restaurant_id": "social_video:8f1b97e392c43ec69d42",
+      "type": "Restaurant",
+      "fallback": {
+        "name": "Ayat Astoria",
+        "address": "33-27 Crescent St, Astoria, NY 11106",
+        "latitude": 40.762031,
+        "longitude": -73.929442
+      }
+    }
+  ]
+}

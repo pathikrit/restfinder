@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "reference": "https://www.instagram.com/reel/DXfiK3IETGK/",
+  "added_at": "2026-08-31T18:13:15.189261Z",
+  "restaurants": [
+    {
+      "restaurant_id": "social_video:87b523fe0094f1a5cc4f",
+      "type": "Restaurant",
+      "fallback": {
+        "name": "ZOI Mediterranean",
+        "address": "19 W 31st St, New York, NY 10001",
+        "latitude": 40.747279,
+        "longitude": -73.986999
+      }
+    }
+  ]
+}

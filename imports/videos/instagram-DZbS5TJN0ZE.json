@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "reference": "https://www.instagram.com/reel/DZbS5TJN0ZE/",
+  "added_at": "2026-08-31T18:13:16.516764Z",
+  "restaurants": [
+    {
+      "restaurant_id": "social_video:0c0c817cbe8a31ccd471",
+      "type": "Restaurant",
+      "fallback": {
+        "name": "Yakiniku Great NYC",
+        "address": "12 W 17th St, New York, NY 10011",
+        "latitude": 40.738129,
+        "longitude": -73.993255
+      }
+    }
+  ]
+}

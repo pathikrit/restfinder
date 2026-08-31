@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "reference": "https://www.instagram.com/reel/DY2C72tATlf/",
+  "added_at": "2026-08-31T18:13:24.977540Z",
+  "restaurants": [
+    {
+      "restaurant_id": "social_video:12ba310e4b6d73e64d82",
+      "type": "Restaurant",
+      "fallback": {
+        "name": "Lillie’s Victorian Establishment — Times Square",
+        "address": "249 West 49th Street, New York, NY 10019",
+        "latitude": 40.761647,
+        "longitude": -73.985907
+      }
+    }
+  ]
+}

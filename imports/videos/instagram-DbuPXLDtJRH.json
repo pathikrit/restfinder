@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "reference": "https://www.instagram.com/reel/DbuPXLDtJRH/",
+  "added_at": "2026-08-31T18:12:50.684468Z",
+  "restaurants": [
+    {
+      "restaurant_id": "social_video:f7e17c77e9541f1a0ea2",
+      "type": "Restaurant",
+      "fallback": {
+        "name": "Cynthia",
+        "address": "32 Jones Street, New York, NY 10014",
+        "latitude": 40.73172,
+        "longitude": -74.003037
+      }
+    }
+  ]
+}

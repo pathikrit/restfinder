@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 import json
+import re
 import wave
 
 import av
@@ -8,6 +9,7 @@ import pytest
 import requests
 
 from restfinder.social_video import (
+    _instagram_reference_pattern,
     DatabaseRestaurant,
     NominatimGeocoder,
     build_manifest,
@@ -17,6 +19,7 @@ from restfinder.social_video import (
     fallback_id,
     inspect_draft,
     inspect_source_status,
+    in_nyc_metro,
     local_media_caption,
     local_media_paths,
     normalize_extraction,
@@ -62,6 +65,16 @@ def test_social_identity_canonicalizes_supported_urls():
     assert instagram.post_id == "DcU1FfROXHZ"
     assert instagram.canonical_url == "https://www.instagram.com/p/DcU1FfROXHZ/"
 
+    creator_prefixed_instagram = social_identity(
+        "https://www.instagram.com/angelhuangny/reel/DcU1FfROXHZ/"
+    )
+    assert creator_prefixed_instagram.platform == "instagram"
+    assert creator_prefixed_instagram.post_id == "DcU1FfROXHZ"
+    assert (
+        creator_prefixed_instagram.canonical_url
+        == "https://www.instagram.com/reel/DcU1FfROXHZ/"
+    )
+
     tiktok = social_identity("https://m.tiktok.com/@food/video/123456?is_from_webapp=1")
     assert tiktok.platform == "tiktok"
     assert tiktok.post_id == "123456"
@@ -78,12 +91,32 @@ def test_social_identity_canonicalizes_supported_urls():
     [
         "https://example.com/video/1",
         "https://www.instagram.com/accounts/login/",
+        "https://www.instagram.com/creator/reel/DcU1FfROXHZ/extra/",
         "https://www.tiktok.com/@food",
     ],
 )
 def test_social_identity_rejects_unsupported_urls(url):
     with pytest.raises(ValueError):
         social_identity(url)
+
+
+def test_instagram_reference_pattern_matches_only_equivalent_post_urls():
+    pattern = _instagram_reference_pattern("DcU1FfROXHZ")
+    equivalent_urls = [
+        "https://www.instagram.com/p/DcU1FfROXHZ/",
+        "https://instagram.com/reel/DcU1FfROXHZ/",
+        "https://www.instagram.com/tv/DcU1FfROXHZ",
+        "https://www.instagram.com/angelhuangny/reel/DcU1FfROXHZ/",
+    ]
+    unrelated_urls = [
+        "https://example.com/p/DcU1FfROXHZ/",
+        "http://www.instagram.com/p/DcU1FfROXHZ/",
+        "https://www.instagram.com/p/different/",
+        "https://www.instagram.com/creator/reel/DcU1FfROXHZ/extra/",
+    ]
+
+    assert all(re.fullmatch(pattern, url) for url in equivalent_urls)
+    assert not any(re.fullmatch(pattern, url) for url in unrelated_urls)
 
 
 def test_social_download_url_requires_https_platform_host():
@@ -253,6 +286,54 @@ def test_geocoder_caches_nyc_results(tmp_path):
     assert first["latitude"] == 40.7501
     assert session.calls == 1
     assert json.loads(cache.read_text())
+
+
+def test_nyc_metro_bounds_include_jersey_city():
+    assert in_nyc_metro(40.7221015, -74.0402704)
+    assert not in_nyc_metro(39.9526, -75.1652)
+
+
+class MetroGeocodeResponse:
+    def raise_for_status(self):
+        return None
+
+    def json(self):
+        return [
+            {
+                "lat": "40.7221015",
+                "lon": "-74.0402704",
+                "display_name": "175 2nd Street, Jersey City, NJ 07302",
+            }
+        ]
+
+
+class MetroGeocodeSession:
+    def __init__(self):
+        self.headers = {}
+        self.params = None
+
+    def get(self, _url, **kwargs):
+        self.params = kwargs["params"]
+        return MetroGeocodeResponse()
+
+
+def test_geocoder_accepts_nyc_metro_address_without_forcing_nyc_suffix(tmp_path):
+    session = MetroGeocodeSession()
+    geocoder = NominatimGeocoder(
+        cache_path=tmp_path / "geocode.json",
+        session=session,
+        minimum_interval_seconds=0,
+    )
+
+    result = geocoder.geocode(
+        "Mango Mango Dessert", "175 2nd St, Jersey City, NJ 07302"
+    )
+
+    assert result["longitude"] == -74.0402704
+    assert session.params["q"] == (
+        "Mango Mango Dessert, 175 2nd St, Jersey City, NJ 07302"
+    )
+    assert session.params["viewbox"] == "-74.50,41.20,-73.20,40.40"
 
 
 class FailedGeocodeResponse:
@@ -438,6 +519,24 @@ def test_validate_draft_refuses_unstable_fallback_id():
 
     with pytest.raises(ValueError, match="stable identity"):
         validate_draft(draft)
+
+
+def test_validate_draft_accepts_reviewed_nyc_metro_fallback():
+    draft = approved_draft()
+    resolution = draft["venues"][1]["resolution"]
+    resolution.update(
+        {
+            "fallback_id": fallback_id(
+                "Mango Mango Dessert", 40.7221015, -74.0402704
+            ),
+            "name": "Mango Mango Dessert",
+            "address": "175 2nd St, Jersey City, NJ 07302",
+            "latitude": 40.7221015,
+            "longitude": -74.0402704,
+        }
+    )
+
+    validate_draft(draft)
 
 
 def test_inspect_draft_displays_matches_and_fallbacks():

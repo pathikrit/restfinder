@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "reference": "https://www.instagram.com/reel/DaXtQptOzUM/",
+  "added_at": "2026-08-31T18:13:42.392055Z",
+  "restaurants": [
+    {
+      "restaurant_id": "social_video:1325a334de7bfe7237df",
+      "type": "Bars",
+      "fallback": {
+        "name": "So & So's",
+        "address": "302 West 52nd Street, New York, NY",
+        "latitude": 40.763318,
+        "longitude": -73.98582
+      }
+    }
+  ]
+}

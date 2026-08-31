@@ -438,9 +438,18 @@ def test_social_video_import_is_reviewed_synchronized_and_idempotent():
     assert (first.types_updated, first.references_inserted) == (1, 2)
     assert (second.inserted_fallbacks, second.updated_fallbacks) == (0, 1)
     assert (second.types_updated, second.references_inserted) == (0, 0)
-    status = source_import_status(reference, connection_url=TEST_DATABASE_URL)
-    assert status["imported"] is True
-    assert len(status["restaurants"]) == 2
+    equivalent_references = [
+        reference,
+        "https://www.instagram.com/reel/DcU1FfROXHZ/",
+        "https://www.instagram.com/tv/DcU1FfROXHZ/",
+        "https://www.instagram.com/angelhuangny/reel/DcU1FfROXHZ/",
+    ]
+    for equivalent_reference in equivalent_references:
+        status = source_import_status(
+            equivalent_reference, connection_url=TEST_DATABASE_URL
+        )
+        assert status["imported"] is True
+        assert len(status["restaurants"]) == 2
     with psycopg.connect(TEST_DATABASE_URL) as connection:
         assert connection.execute(
             "SELECT type FROM restaurants WHERE id = %s", (master.id,)

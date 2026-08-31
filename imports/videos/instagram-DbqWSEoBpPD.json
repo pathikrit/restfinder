@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "reference": "https://www.instagram.com/reel/DbqWSEoBpPD/",
+  "added_at": "2026-08-31T18:12:52.052454Z",
+  "restaurants": [
+    {
+      "restaurant_id": "nyc_dohmh:50182742",
+      "type": "Coffee Shops"
+    }
+  ]
+}

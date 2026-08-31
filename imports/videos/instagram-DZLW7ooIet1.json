@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "reference": "https://www.instagram.com/reel/DZLW7ooIet1/",
+  "added_at": "2026-08-31T18:13:22.082645Z",
+  "restaurants": [
+    {
+      "restaurant_id": "social_video:85af3a2c6ce01f754a9e",
+      "type": "Restaurant",
+      "fallback": {
+        "name": "Muku",
+        "address": "412 Greenwich St, Penthouse B, New York, NY 10013",
+        "latitude": 40.721904,
+        "longitude": -74.01009
+      }
+    }
+  ]
+}

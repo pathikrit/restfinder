@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "reference": "https://www.instagram.com/reel/DXXmpilE_hK/",
+  "added_at": "2026-08-31T18:13:17.955187Z",
+  "restaurants": [
+    {
+      "restaurant_id": "social_video:90672f09c6669177b73f",
+      "type": "Bars",
+      "fallback": {
+        "name": "Bar Chimera",
+        "address": "550 Madison Ave",
+        "latitude": 40.761483,
+        "longitude": -73.973504
+      }
+    },
+    {
+      "restaurant_id": "social_video:e7546124548adf1006f9",
+      "type": "Restaurant",
+      "fallback": {
+        "name": "COTE 550",
+        "address": "550 Madison Ave, New York, NY 10022",
+        "latitude": 40.761483,
+        "longitude": -73.973504
+      }
+    }
+  ]
+}

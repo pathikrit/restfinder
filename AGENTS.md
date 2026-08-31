@@ -141,8 +141,9 @@ Analysis transcribes audio, samples timestamped frames, extracts grounded venue
 mentions with structured OpenAI output, and resolves them against Neon. Matching
 prefers current DOHMH rows, then historical DOHMH rows, then existing external
 fallbacks. Ambiguous canonical matches remain unresolved. Clearly identified
-unmatched NYC venues may become `social_video` fallbacks only after their address
-and coordinates have been reviewed. Public Nominatim use is cached, serialized,
+unmatched NYC-metro venues may become `social_video` fallbacks only after their
+address and coordinates have been reviewed. The metro boundary matches the
+enrichment region and includes nearby cities such as Jersey City. Public Nominatim use is cached, serialized,
 and limited to one request per second. NYC Planning GeoSearch is the
 authoritative address fallback, followed by bounded Photon search when both are
 unavailable.

@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "reference": "https://www.instagram.com/reel/DPcQoURjjh_/",
+  "added_at": "2026-08-31T18:14:25.580838Z",
+  "restaurants": [
+    {
+      "restaurant_id": "social_video:6459a585ea5c563823b5",
+      "type": "Dessert",
+      "fallback": {
+        "name": "QM Dessert Lab",
+        "address": "133-48 37th Ave, Ste 1B, Queens, NY",
+        "latitude": 40.760606,
+        "longitude": -73.833208
+      }
+    }
+  ]
+}

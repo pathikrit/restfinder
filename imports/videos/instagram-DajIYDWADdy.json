@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "reference": "https://www.instagram.com/reel/DajIYDWADdy/",
+  "added_at": "2026-08-31T18:13:27.631154Z",
+  "restaurants": [
+    {
+      "restaurant_id": "nyc_dohmh:50141193",
+      "type": "Restaurant"
+    },
+    {
+      "restaurant_id": "nyc_dohmh:50121471",
+      "type": "Coffee Shops"
+    },
+    {
+      "restaurant_id": "kmz:ricks-list:274b0be5ed1f698c7e46",
+      "type": "Restaurant"
+    },
+    {
+      "restaurant_id": "nyc_dohmh:50145812",
+      "type": "Bars"
+    },
+    {
+      "restaurant_id": "nyc_dohmh:50178035",
+      "type": "Bars"
+    },
+    {
+      "restaurant_id": "social_video:9f37ede76cae30311765",
+      "type": "Bars",
+      "fallback": {
+        "name": "Rory’s Rooftop",
+        "address": "446 W 14th St, New York, NY 10014",
+        "latitude": 40.741579,
+        "longitude": -74.007591
+      }
+    }
+  ]
+}

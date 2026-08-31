@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "reference": "https://www.instagram.com/reel/C7HomLGxhun/",
+  "added_at": "2026-08-31T18:29:40.059213Z",
+  "restaurants": [
+    {
+      "restaurant_id": "social_video:e92c09ad8db7b55958e5",
+      "type": "Dessert",
+      "fallback": {
+        "name": "Mango Mango Dessert",
+        "address": "175 2nd St, Jersey City, NJ 07302",
+        "latitude": 40.7221015,
+        "longitude": -74.0402704
+      }
+    }
+  ]
+}

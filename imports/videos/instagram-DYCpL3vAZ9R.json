@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "reference": "https://www.instagram.com/reel/DYCpL3vAZ9R/",
+  "added_at": "2026-08-31T18:13:34.928807Z",
+  "restaurants": [
+    {
+      "restaurant_id": "social_video:c2e14fcdc6fa580f7539",
+      "type": "Restaurant",
+      "fallback": {
+        "name": "Studio Calmplex",
+        "address": "231 E 50th St, Lower Level, New York, NY 10022",
+        "latitude": 40.755498,
+        "longitude": -73.969429
+      }
+    }
+  ]
+}

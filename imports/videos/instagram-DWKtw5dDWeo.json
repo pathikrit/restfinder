@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "reference": "https://www.instagram.com/reel/DWKtw5dDWeo/",
+  "added_at": "2026-08-31T18:13:03.807361Z",
+  "restaurants": [
+    {
+      "restaurant_id": "social_video:dadb3330b8ef1083dfeb",
+      "type": "Hidden / Speakeasy",
+      "fallback": {
+        "name": "Bar AO",
+        "address": "249 E 49th St, New York, NY",
+        "latitude": 40.75461,
+        "longitude": -73.969369
+      }
+    }
+  ]
+}

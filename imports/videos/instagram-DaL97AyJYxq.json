@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "reference": "https://www.instagram.com/reel/DaL97AyJYxq/",
+  "added_at": "2026-08-31T18:13:50.535366Z",
+  "restaurants": [
+    {
+      "restaurant_id": "social_video:4907ed9da6de0faabb6c",
+      "type": "Coffee Shops",
+      "fallback": {
+        "name": "Ray-Ban House",
+        "address": "62 Prince St, New York",
+        "latitude": 40.723636,
+        "longitude": -73.996789
+      }
+    }
+  ]
+}

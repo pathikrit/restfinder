@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "reference": "https://www.instagram.com/reel/DaM35oON46j/",
+  "added_at": "2026-08-31T18:14:06.692528Z",
+  "restaurants": [
+    {
+      "restaurant_id": "social_video:5ab8186764fa935b4d44",
+      "type": "Restaurant",
+      "fallback": {
+        "name": "Crab House Times Square",
+        "address": "218 W 40th St, New York, NY 10018",
+        "latitude": 40.754988,
+        "longitude": -73.989067
+      }
+    }
+  ]
+}

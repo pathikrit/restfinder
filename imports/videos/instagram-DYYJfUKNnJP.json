@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "reference": "https://www.instagram.com/reel/DYYJfUKNnJP/",
+  "added_at": "2026-08-31T18:14:05.097813Z",
+  "restaurants": [
+    {
+      "restaurant_id": "social_video:eba5e44809d14b775545",
+      "type": "Restaurant",
+      "fallback": {
+        "name": "Yoshoku",
+        "address": "301 Park Ave, New York, NY 10022",
+        "latitude": 40.756511,
+        "longitude": -73.973347
+      }
+    }
+  ]
+}

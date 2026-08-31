@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "reference": "https://www.instagram.com/reel/DVL9p2-kRrL/",
+  "added_at": "2026-08-31T18:13:05.368862Z",
+  "restaurants": [
+    {
+      "restaurant_id": "nyc_dohmh:50160472",
+      "type": "Hidden / Speakeasy"
+    },
+    {
+      "restaurant_id": "social_video:5117ca91dafd1f225a11",
+      "type": "Hidden / Speakeasy",
+      "fallback": {
+        "name": "The Bar Downstairs & Kitchen",
+        "address": "485 5th Avenue, New York, NY 10017",
+        "latitude": 40.752878,
+        "longitude": -73.981017
+      }
+    },
+    {
+      "restaurant_id": "social_video:f4b8e0fad64491303f0f",
+      "type": "Hidden / Speakeasy",
+      "fallback": {
+        "name": "Mangetsu Speakeasy",
+        "address": "193 7th Ave, New York, NY 10011",
+        "latitude": 40.74289,
+        "longitude": -73.996119
+      }
+    },
+    {
+      "restaurant_id": "social_video:19ffd62534de1ca4a219",
+      "type": "Hidden / Speakeasy",
+      "fallback": {
+        "name": "The Woo Woo",
+        "address": "266 W 47th Street, New York, NY 10036",
+        "latitude": 40.760117,
+        "longitude": -73.987283
+      }
+    },
+    {
+      "restaurant_id": "kmz:zoo-boozes-hidden:04f6d8ac7d22ab1d4f3f",
+      "type": "Hidden / Speakeasy"
+    },
+    {
+      "restaurant_id": "social_video:2a20a37bef3f0a5d85cf",
+      "type": "Hidden / Speakeasy",
+      "fallback": {
+        "name": "Async",
+        "address": "90 Clinton St, New York, NY 10002",
+        "latitude": 40.718277,
+        "longitude": -73.985205
+      }
+    },
+    {
+      "restaurant_id": "nyc_dohmh:50126927",
+      "type": "Hidden / Speakeasy"
+    }
+  ]
+}

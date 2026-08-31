@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "reference": "https://www.instagram.com/reel/DatVrWjB2Cc/",
+  "added_at": "2026-08-31T18:13:09.895075Z",
+  "restaurants": [
+    {
+      "restaurant_id": "social_video:a9da35a1d1ebc165da22",
+      "type": "Restaurant",
+      "fallback": {
+        "name": "Phê",
+        "address": "72 Forsyth St, New York, NY 10002",
+        "latitude": 40.717092,
+        "longitude": -73.99323
+      }
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "reference": "https://www.instagram.com/reel/DaDpq0SAMYP/",
+  "added_at": "2026-08-31T18:14:18.255781Z",
+  "restaurants": [
+    {
+      "restaurant_id": "kmz:ricks-list:5d3c001d14d3f40b3385",
+      "type": "Restaurant"
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "reference": "https://www.instagram.com/reel/Da5QlGmOwg2/",
+  "added_at": "2026-08-31T18:13:07.246573Z",
+  "restaurants": [
+    {
+      "restaurant_id": "social_video:4418320bc510eff1ff22",
+      "type": "Coffee Shops",
+      "fallback": {
+        "name": "On Lab",
+        "address": "106 Rivington St, New York, NY 10002",
+        "latitude": 40.720149,
+        "longitude": -73.987928
+      }
+    }
+  ]
+}

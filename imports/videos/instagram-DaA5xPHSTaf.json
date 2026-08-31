@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "reference": "https://www.instagram.com/reel/DaA5xPHSTaf/",
+  "added_at": "2026-08-31T18:14:19.688592Z",
+  "restaurants": [
+    {
+      "restaurant_id": "nyc_dohmh:50181835",
+      "type": "Bars"
+    },
+    {
+      "restaurant_id": "nyc_dohmh:50178299",
+      "type": "Bars"
+    },
+    {
+      "restaurant_id": "nyc_dohmh:50178023",
+      "type": "Bars"
+    }
+  ]
+}

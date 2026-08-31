@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "reference": "https://www.instagram.com/reel/Czv5kWNsF_3/",
+  "added_at": "2026-08-31T18:14:46.137262Z",
+  "restaurants": [
+    {
+      "restaurant_id": "social_video:ca19050afb11b2e2242d",
+      "type": "Restaurant",
+      "fallback": {
+        "name": "Café Sabarsky",
+        "address": "1048 Fifth Avenue, New York, NY 10028",
+        "latitude": 40.781227,
+        "longitude": -73.960228
+      }
+    }
+  ]
+}

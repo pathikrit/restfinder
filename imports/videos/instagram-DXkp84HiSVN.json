@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "reference": "https://www.instagram.com/reel/DXkp84HiSVN/",
+  "added_at": "2026-08-31T18:13:29.116733Z",
+  "restaurants": [
+    {
+      "restaurant_id": "social_video:9f52bada4db5d2b98368",
+      "type": "Restaurant",
+      "fallback": {
+        "name": "Carversteak",
+        "address": "305 West 48th Street, New York, NY 10036",
+        "latitude": 40.761441,
+        "longitude": -73.987414
+      }
+    }
+  ]
+}

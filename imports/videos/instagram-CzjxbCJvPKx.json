@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "reference": "https://www.instagram.com/reel/CzjxbCJvPKx/",
+  "added_at": "2026-08-31T18:14:56.898685Z",
+  "restaurants": [
+    {
+      "restaurant_id": "social_video:5ab150f0ff4be0b6bd9e",
+      "type": "Restaurant",
+      "fallback": {
+        "name": "Ume Williamsburg",
+        "address": "237 Kent Ave, Brooklyn, NY 11249",
+        "latitude": 40.71651,
+        "longitude": -73.965446
+      }
+    }
+  ]
+}

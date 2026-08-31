@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "reference": "https://www.instagram.com/reel/Cz43B3ZrSve/",
+  "added_at": "2026-08-31T18:14:55.403665Z",
+  "restaurants": [
+    {
+      "restaurant_id": "social_video:cf0200e56ffb7806b98b",
+      "type": "Restaurant",
+      "fallback": {
+        "name": "Café Carmellini",
+        "address": "250 Fifth Avenue, New York, NY 10001",
+        "latitude": 40.745049,
+        "longitude": -73.987756
+      }
+    },
+    {
+      "restaurant_id": "social_video:04422c3f88f69162dd5a",
+      "type": "Bars",
+      "fallback": {
+        "name": "The Portrait Bar",
+        "address": "1 West 28th Street, New York, NY 10001",
+        "latitude": 40.745049,
+        "longitude": -73.987756
+      }
+    }
+  ]
+}

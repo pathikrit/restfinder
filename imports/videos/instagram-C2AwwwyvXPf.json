@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "reference": "https://www.instagram.com/reel/C2AwwwyvXPf/",
+  "added_at": "2026-08-31T18:14:43.171803Z",
+  "restaurants": [
+    {
+      "restaurant_id": "kmz:ricks-list:e0e5943190cc9f1ca759",
+      "type": "Restaurant"
+    },
+    {
+      "restaurant_id": "nyc_dohmh:50058630",
+      "type": "Restaurant"
+    }
+  ]
+}
