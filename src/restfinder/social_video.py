@@ -1,4 +1,4 @@
-"""Analyze social videos and import reviewed NYC restaurant references."""
+"""Analyze social posts and import reviewed NYC restaurant references."""
 
 from __future__ import annotations
 
@@ -55,7 +55,7 @@ NYC_BOUNDS = {
     "east": -73.7004,
 }
 INSTAGRAM_PATH = re.compile(r"^/(p|reel|tv)/([A-Za-z0-9_-]+)/?")
-TIKTOK_PATH = re.compile(r"^/@([^/]+)/video/(\d+)/?")
+TIKTOK_PATH = re.compile(r"^/@([^/]+)/(video|photo)/(\d+)/?")
 SOCIAL_HOSTS = {
     "instagram.com",
     "www.instagram.com",
@@ -207,12 +207,15 @@ def social_identity(url: str) -> SocialIdentity:
     if host in {"tiktok.com", "www.tiktok.com", "m.tiktok.com"}:
         match = TIKTOK_PATH.match(parsed.path)
         if not match:
-            raise ValueError("TikTok URL must be a canonical /@user/video/ID URL")
-        user, post_id = match.groups()
+            raise ValueError(
+                "TikTok URL must identify a canonical /@user/video/ID or "
+                "/@user/photo/ID post"
+            )
+        user, kind, post_id = match.groups()
         return SocialIdentity(
             "tiktok",
             post_id,
-            f"https://www.tiktok.com/@{user}/video/{post_id}",
+            f"https://www.tiktok.com/@{user}/{kind}/{post_id}",
         )
     raise ValueError("Only Instagram and TikTok post URLs are supported")
 
@@ -291,6 +294,43 @@ def _media_kind(path: Path) -> str:
     if mime_type and mime_type.startswith("image/"):
         return "image"
     return "video"
+
+
+def local_media_paths(path: Path) -> tuple[Path, ...]:
+    if path.is_file():
+        return (path,)
+    if not path.is_dir():
+        raise ValueError(f"Local media path does not exist: {path}")
+
+    def natural_key(candidate: Path) -> tuple[tuple[int, int | str], ...]:
+        return tuple(
+            (1, int(part)) if part.isdigit() else (0, part.casefold())
+            for part in re.split(r"(\d+)", candidate.name)
+        )
+
+    media = tuple(
+        sorted(
+            (
+                candidate
+                for candidate in path.iterdir()
+                if candidate.is_file()
+                and not candidate.name.startswith(".")
+                and (mimetypes.guess_type(candidate.name)[0] or "").split("/", 1)[0]
+                in {"image", "video"}
+            ),
+            key=natural_key,
+        )
+    )
+    if not media:
+        raise ValueError(f"No supported image or video files found in {path}")
+    return media
+
+
+def local_media_caption(path: Path) -> str | None:
+    caption_path = path / "caption.txt" if path.is_dir() else None
+    if caption_path and caption_path.is_file():
+        return clean_text(caption_path.read_text())
+    return None
 
 
 def extract_audio(path: Path, output: Path) -> Path | None:
@@ -1103,13 +1143,18 @@ def analyze(
         if input_path.exists():
             if not source_url:
                 raise ValueError(
-                    "--source-url is required when analyzing a local media file"
+                    "--source-url is required when analyzing local media"
                 )
             identity = social_identity(source_url)
-            media = MediaDownload(identity, None, None, (input_path,))
+            media = MediaDownload(
+                identity,
+                None,
+                local_media_caption(input_path),
+                local_media_paths(input_path),
+            )
         else:
             if source_url:
-                raise ValueError("--source-url is only valid with a local media file")
+                raise ValueError("--source-url is only valid with local media")
             media = download_social_media(input_value, working_directory)
 
         transcripts = []
@@ -1156,6 +1201,7 @@ def analyze(
             "post_id": media.identity.post_id,
             "title": media.title,
             "theme": clean_text(extraction.get("theme")),
+            "media_item_count": len(media.paths),
             "analyzed_at": isoformat(utc_now()),
             "venues": resolved,
         }
@@ -1569,10 +1615,10 @@ def main() -> None:
 
     analyze_parser = subparsers.add_parser("analyze", help="create a reviewed draft")
     analyze_parser.add_argument(
-        "input", help="Instagram/TikTok URL or local media path"
+        "input", help="Instagram/TikTok URL, media file, or ordered media directory"
     )
     analyze_parser.add_argument(
-        "--source-url", help="original post URL for a local media file"
+        "--source-url", help="original post URL for local media"
     )
     analyze_parser.add_argument("--output", type=Path, help="draft output path")
 

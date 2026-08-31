@@ -128,14 +128,14 @@ Checked-in manifests under `imports/` use this shape:
 The importer rejects unknown IDs, applies an invocation transactionally, and is
 idempotent.
 
-## Social video imports
+## Social post imports
 
 The repository-local `/import-ig` skill under `.agents/skills/import-ig/`
-handles Instagram and TikTok restaurant
-recommendation posts. `src/restfinder/social_video.py` first attempts an
-unauthenticated public download; if a platform blocks it, analyze a user-supplied
-media file with its original `--source-url`. Never extract browser cookies for
-this workflow.
+handles Instagram and TikTok restaurant recommendation posts, including videos
+and image carousels. `src/restfinder/social_video.py` first attempts an
+unauthenticated public download; if a platform blocks it, analyze user-supplied
+media with its original `--source-url`. An ordered directory of image/video
+files represents a carousel. Never extract browser cookies for this workflow.
 
 Analysis transcribes audio, samples timestamped frames, extracts grounded venue
 mentions with structured OpenAI output, and resolves them against Neon. Matching
@@ -151,9 +151,9 @@ Drafts and the geocoding cache live under ignored `.restfinder/`. A selected
 unresolved row blocks import. After explicit approval, the importer writes a
 versioned manifest under `imports/videos/` and applies one database transaction:
 fallback upserts, type upgrades using the existing specificity priority, and an
-exact synchronization of references for that video URL. Repeated imports are
+exact synchronization of references for that post URL. Repeated imports are
 idempotent. The skill must never run the `import` command or pass `--import-db`
-before the user approves the displayed one-video review. It must not commit or
+before the user approves the displayed one-post review. It must not commit or
 push Git changes unless requested.
 
 Before analysis, the skill checks the canonical post URL against

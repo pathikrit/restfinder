@@ -17,12 +17,41 @@ from restfinder.social_video import (
     fallback_id,
     inspect_draft,
     inspect_source_status,
+    local_media_caption,
+    local_media_paths,
     normalize_extraction,
     social_identity,
     validate_draft,
     validate_manifest,
     validate_social_download_url,
 )
+
+
+def test_local_media_directory_uses_natural_slide_order(tmp_path):
+    (tmp_path / "slide-10.png").write_bytes(b"image")
+    (tmp_path / "slide-2.jpg").write_bytes(b"image")
+    (tmp_path / "slide-1.webp").write_bytes(b"image")
+    (tmp_path / "notes.txt").write_text("ignore me")
+    (tmp_path / ".hidden.png").write_bytes(b"image")
+
+    assert [path.name for path in local_media_paths(tmp_path)] == [
+        "slide-1.webp",
+        "slide-2.jpg",
+        "slide-10.png",
+    ]
+
+
+def test_local_media_directory_rejects_an_empty_selection(tmp_path):
+    (tmp_path / "notes.txt").write_text("no media")
+
+    with pytest.raises(ValueError, match="No supported image or video"):
+        local_media_paths(tmp_path)
+
+
+def test_local_media_directory_reads_an_exact_caption_file(tmp_path):
+    (tmp_path / "caption.txt").write_text("  Top 10 omakase spots\n\nSave this list  ")
+
+    assert local_media_caption(tmp_path) == "Top 10 omakase spots Save this list"
 
 
 def test_social_identity_canonicalizes_supported_urls():
@@ -37,6 +66,11 @@ def test_social_identity_canonicalizes_supported_urls():
     assert tiktok.platform == "tiktok"
     assert tiktok.post_id == "123456"
     assert tiktok.canonical_url == "https://www.tiktok.com/@food/video/123456"
+
+    tiktok_photo = social_identity("https://www.tiktok.com/@food/photo/987654?lang=en")
+    assert tiktok_photo.platform == "tiktok"
+    assert tiktok_photo.post_id == "987654"
+    assert tiktok_photo.canonical_url == "https://www.tiktok.com/@food/photo/987654"
 
 
 @pytest.mark.parametrize(
