@@ -41,7 +41,7 @@ def test_frontend_uses_social_domains_as_reference_labels():
 
     assert "'instagram.com': 'Instagram'" in javascript
     assert "'tiktok.com': 'TikTok'" in javascript
-    assert "`${referenceLabel(value)} ${value}`" in javascript
+    assert "referenceLabel(item.reference || '')" in javascript
 
 
 def test_frontend_uses_google_maps_and_live_place_details():

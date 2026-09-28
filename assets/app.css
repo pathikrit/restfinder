@@ -47,14 +47,26 @@ tbody tr { cursor:pointer; } tbody tr:hover,tbody tr.selected { background:var(-
 .map-link { display:inline-grid; width:22px; height:22px; margin-left:5px; place-items:center; border-radius:5px; color:var(--blue); font-size:10px; text-decoration:none; vertical-align:-1px; }
 .map-link:hover,.map-link:focus-visible { background:rgba(96,165,250,.14); color:#93c5fd; outline:none; }
 .filter { position:relative; margin-top:5px; } .filter input { width:100%; min-width:90px; padding:5px 7px; border:1px solid var(--line); border-radius:5px; outline:none; background:var(--bg); color:var(--text); font:inherit; font-size:11px; }
-.filter input:focus { border-color:var(--blue); } .empty { display:grid; min-height:160px; place-items:center; padding:24px; color:var(--muted); text-align:center; }
+.filter input:focus { border-color:var(--blue); }
+.filter-dropdown { position:relative; margin-top:5px; font-size:11px; font-weight:400; }
+.filter-dropdown summary { display:flex; min-width:90px; min-height:29px; align-items:center; justify-content:space-between; gap:8px; padding:5px 7px; border:1px solid var(--line); border-radius:5px; background:var(--bg); color:var(--text); cursor:pointer; list-style:none; }
+.filter-dropdown summary::-webkit-details-marker { display:none; }
+.filter-dropdown summary:hover,.filter-dropdown summary:focus-visible { border-color:var(--blue); outline:none; }
+.filter-summary { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.filter-dropdown summary i { color:var(--muted); font-size:10px; }
+.filter-dropdown[open] summary i { transform:rotate(180deg); }
+.filter-menu { position:absolute; z-index:5; top:calc(100% + 3px); left:0; width:max(100%,170px); max-width:min(300px,80vw); max-height:220px; overflow:auto; padding:4px; border:1px solid var(--line); border-radius:7px; background:var(--panel); box-shadow:0 10px 24px var(--shadow); }
+.filter-option { display:flex; min-height:34px; align-items:center; gap:8px; padding:5px 7px; border-radius:4px; color:var(--text); cursor:pointer; overflow-wrap:anywhere; }
+.filter-option:hover,.filter-option:focus-within { background:var(--panel-soft); }
+.filter-option input { width:16px; height:16px; flex:0 0 auto; margin:0; accent-color:var(--blue); }
+.empty { display:grid; min-height:160px; place-items:center; padding:24px; color:var(--muted); text-align:center; }
 @media (max-width:700px) {
   body { grid-template-rows:auto minmax(220px,42dvh) minmax(0,1fr); }
   header { grid-template-columns:minmax(0,1fr) max-content; gap:7px 10px; padding:max(8px,env(safe-area-inset-top)) max(10px,env(safe-area-inset-right)) 8px max(10px,env(safe-area-inset-left)); }
   h1 { font-size:14px; } .version { font-size:10px; } .address-search { grid-column:1 / -1; grid-row:2; }
   .details { top:6px; right:6px; width:calc(100% - 12px); max-height:calc(100% - 35px); }
   table,thead,tbody { display:block; width:100%; } thead tr { display:grid; grid-template-columns:1fr 1fr; gap:7px; padding:8px 10px; }
-  th { width:auto !important; padding:0; border:0; } th:first-child { display:none; } th:nth-child(4) { grid-column:1 / -1; } .filter input { font-size:16px; }
+  th { width:auto !important; padding:0; border:0; } th:first-child { display:none; } th:nth-child(4) { grid-column:1 / -1; } .filter input { font-size:16px; } .filter-dropdown { font-size:14px; } .filter-menu { max-width:100%; }
   tbody tr { display:grid; grid-template-columns:28px minmax(0,1fr); gap:3px 8px; padding:10px; border-bottom:1px solid var(--row-line); }
   td { width:auto !important; max-width:none; padding:0; overflow:visible; border:0; white-space:normal; } td:first-child { grid-row:1 / 4; color:var(--muted); font-size:11px; }
   td:nth-child(2) { font-size:15px; } td:nth-child(3) { color:var(--muted); font-size:12px; } td:nth-child(3)::before { content:"Type · "; }

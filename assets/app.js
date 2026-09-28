@@ -1,4 +1,4 @@
-const filters = { name: '', type: '', references: '' };
+const filters = { name: '', type: new Set(), references: new Set() };
 const markers = new Map();
 let markerLabelMode = false;
 let restaurants = [];
@@ -24,6 +24,9 @@ const referenceLabels = {
   'ny.itsfound.com': 'Itsfound', 'atlasobscura.com': 'Atlas Obscura',
   'theinfatuation.com': 'Infatuation'
 };
+const initiallyExcludedReferences = new Set([
+  'James Beard', 'Infatuation', 'Atlas Obscura', 'Michelin', 'Itsfound'
+]);
 
 const themeMediaQuery = window.matchMedia?.('(prefers-color-scheme: dark)');
 
@@ -144,11 +147,16 @@ function googleMapsFallbackHtml(restaurant) {
   return `<a class="google-maps-fallback" href="${googleMapsUrl(restaurant)}" target="_blank" rel="noopener">Open in Maps</a>`;
 }
 
-function referenceSearchText(restaurant) {
-  return (restaurant.references || []).map(item => {
-    const value = item.reference || '';
-    return `${referenceLabel(value)} ${value}`;
-  }).join(' ').toLowerCase();
+function referenceNames(restaurant) {
+  return (restaurant.references || []).map(item => referenceLabel(item.reference || ''));
+}
+
+function typeOptions() {
+  return [...new Set(restaurants.map(item => item.type || 'Unclassified'))].sort();
+}
+
+function referenceOptions() {
+  return [...new Set(restaurants.flatMap(referenceNames).filter(Boolean))].sort();
 }
 
 function filteredRestaurants() {
@@ -156,8 +164,8 @@ function filteredRestaurants() {
     const inBounds = !map || !map.getBounds() || map.getBounds().contains({ lat: restaurant.lat, lng: restaurant.lon });
     return inBounds
       && (!filters.name || (restaurant.name || '').toLowerCase().includes(filters.name))
-      && (!filters.type || (restaurant.type || 'unclassified').toLowerCase().includes(filters.type))
-      && (!filters.references || referenceSearchText(restaurant).includes(filters.references));
+      && filters.type.has(restaurant.type || 'Unclassified')
+      && referenceNames(restaurant).some(name => filters.references.has(name));
   });
 }
 
@@ -249,6 +257,13 @@ function filterInput(key) {
   return `<div class="filter"><input data-filter="${key}" value="${escapeHtml(filters[key])}" placeholder="Filter…" aria-label="Filter ${key}"></div>`;
 }
 
+function filterDropdown(key, label, values) {
+  const selected = filters[key];
+  const summary = selected.size === values.length ? 'All' : selected.size === 0 ? 'None' : selected.size === 1 ? [...selected][0] : `${selected.size} selected`;
+  const options = values.map(value => `<label class="filter-option"><input type="checkbox" data-choice="${key}" value="${escapeHtml(value)}" ${selected.has(value) ? 'checked' : ''}><span>${escapeHtml(value)}</span></label>`).join('');
+  return `<details class="filter-dropdown" data-dropdown="${key}"><summary aria-label="Filter ${label}: ${escapeHtml(summary)}"><span class="filter-summary">${escapeHtml(summary)}</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i></summary><div class="filter-menu" role="group" aria-label="${label}">${options}</div></details>`;
+}
+
 function renderTable() {
   const visible = filteredRestaurants();
   const wrap = document.getElementById('table-wrap');
@@ -256,21 +271,63 @@ function renderTable() {
     wrap.innerHTML = '<div class="empty">No referenced restaurants have been published yet.</div>';
     return;
   }
-  let html = `<table><thead><tr><th>#<span id="status" class="status">${restaurants.length} places</span></th><th>Name${filterInput('name')}</th><th>Type${filterInput('type')}</th><th>Mentions${filterInput('references')}</th></tr></thead><tbody>`;
+  const openDropdown = wrap.querySelector('.filter-dropdown[open]')?.dataset.dropdown;
+  const focusedDropdown = document.activeElement?.closest('.filter-dropdown')?.dataset.dropdown;
+  const focusedChoice = document.activeElement?.dataset.choice ? {
+    key: document.activeElement.dataset.choice, value: document.activeElement.value
+  } : null;
+  const types = typeOptions();
+  const references = referenceOptions();
+  let html = `<table><thead><tr><th>#<span id="status" class="status">${restaurants.length} places</span></th><th>Name${filterInput('name')}</th><th>Type${filterDropdown('type', 'Type', types)}</th><th>Mentions${filterDropdown('references', 'Mentions', references)}</th></tr></thead><tbody>`;
   visible.forEach((restaurant, index) => {
     html += `<tr class="${restaurant.id === selectedRestaurantId ? 'selected' : ''}" data-id="${escapeHtml(restaurant.id)}"><td>${index + 1}</td><td title="${escapeHtml(restaurant.name)}"><span class="restaurant-name">${escapeHtml(restaurant.name)}</span><a class="map-link" href="${googleMapsUrl(restaurant)}" target="_blank" rel="noopener" aria-label="Open ${escapeHtml(restaurant.name)} in Google Maps"><i class="fa-solid fa-arrow-up-right-from-square"></i></a></td><td>${escapeHtml(restaurant.type || 'Unclassified')}</td><td>${referencesHtml(restaurant.references)}</td></tr>`;
   });
   wrap.innerHTML = `${html}</tbody></table>`;
+  if (openDropdown) wrap.querySelector(`[data-dropdown="${openDropdown}"]`).open = true;
+  if (focusedChoice) {
+    [...wrap.querySelectorAll(`input[data-choice="${focusedChoice.key}"]`)]
+      .find(input => input.value === focusedChoice.value)?.focus();
+  } else if (focusedDropdown) {
+    wrap.querySelector(`[data-dropdown="${focusedDropdown}"] summary`)?.focus();
+  }
   wrap.querySelectorAll('input[data-filter]').forEach(input => input.addEventListener('input', event => {
     filters[event.target.dataset.filter] = event.target.value.trim().toLowerCase();
     renderAll();
     const replacement = document.querySelector(`input[data-filter="${event.target.dataset.filter}"]`);
     replacement?.focus(); replacement?.setSelectionRange(replacement.value.length, replacement.value.length);
   }));
+  wrap.querySelectorAll('input[data-choice]').forEach(input => input.addEventListener('change', event => {
+    const selected = filters[event.target.dataset.choice];
+    if (event.target.checked) selected.add(event.target.value);
+    else selected.delete(event.target.value);
+    renderAll();
+  }));
+  wrap.querySelectorAll('.filter-dropdown').forEach(dropdown => {
+    dropdown.addEventListener('toggle', () => {
+      if (dropdown.open) wrap.querySelectorAll('.filter-dropdown').forEach(other => {
+        if (other !== dropdown) other.open = false;
+      });
+    });
+  });
   wrap.querySelectorAll('tbody tr').forEach(row => row.addEventListener('click', event => {
     if (!event.target.closest('a')) selectRestaurant(row.dataset.id);
   }));
 }
+
+document.addEventListener('click', event => {
+  const clickedDropdown = event.target.closest?.('.filter-dropdown')?.dataset.dropdown;
+  document.querySelectorAll('.filter-dropdown[open]').forEach(dropdown => {
+    if (dropdown.dataset.dropdown !== clickedDropdown) dropdown.open = false;
+  });
+});
+document.addEventListener('keydown', event => {
+  if (event.key !== 'Escape') return;
+  const dropdown = document.querySelector('.filter-dropdown[open]');
+  if (dropdown) {
+    dropdown.open = false;
+    dropdown.querySelector('summary').focus();
+  }
+});
 
 function renderMarkers() {
   if (!map || !mapsLibraries) return;
@@ -405,6 +462,8 @@ async function start() {
       fetch('config.json', { cache: 'no-store' }).then(json)
     ]);
     restaurants = data;
+    filters.type = new Set(typeOptions());
+    filters.references = new Set(referenceOptions().filter(name => !initiallyExcludedReferences.has(name)));
     const latest = restaurants.reduce((value, item) => value > item.last_seen ? value : item.last_seen, '');
     const updated = latest ? new Date(latest).toLocaleDateString('en-GB', {
       day: '2-digit', month: 'short', year: '2-digit', timeZone: 'UTC'
